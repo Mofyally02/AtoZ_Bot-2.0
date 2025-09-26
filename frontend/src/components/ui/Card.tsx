@@ -12,9 +12,10 @@ const Card: React.FC<CardProps> = ({
   const baseClasses = 'rounded-2xl transition-all duration-200';
   
   const variants = {
-    default: 'bg-white dark:bg-secondary-800 shadow-lg border border-secondary-200 dark:border-secondary-700',
-    glass: 'bg-white/10 dark:bg-secondary-800/10 backdrop-blur-md border border-white/20 dark:border-secondary-700/20 shadow-glass',
-    outline: 'bg-transparent border-2 border-secondary-200 dark:border-secondary-700 hover:border-primary-300 dark:hover:border-primary-600',
+    default: 'bg-card text-card-foreground shadow-soft border border-border',
+    glass: 'bg-card/10 backdrop-blur-md border border-border/20 shadow-glass',
+    outline: 'bg-transparent border-2 border-border hover:border-primary/50',
+    elevated: 'bg-card text-card-foreground shadow-soft-lg border border-border hover:shadow-xl transition-shadow duration-200',
   };
   
   return (

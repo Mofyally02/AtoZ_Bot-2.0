@@ -42,17 +42,17 @@ const MetricCard: React.FC<MetricCardProps> = ({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        'p-6 bg-white dark:bg-secondary-800 rounded-2xl shadow-lg border border-secondary-200 dark:border-secondary-700',
-        'hover:shadow-xl transition-all duration-200',
+        'p-6 bg-card text-card-foreground rounded-2xl shadow-soft border border-border',
+        'hover:shadow-soft-lg transition-all duration-200 group',
         className
       )}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-secondary-600 dark:text-secondary-400">
+        <h3 className="text-sm font-medium text-muted-foreground">
           {title}
         </h3>
         {icon && (
-          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+          <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors duration-200">
             {icon}
           </div>
         )}
@@ -60,7 +60,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
       
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-3xl font-bold text-secondary-900 dark:text-white">
+          <p className="text-3xl font-bold text-card-foreground">
             {value}
           </p>
           {change !== undefined && (

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/layout/Layout';
 import Analytics from './pages/Analytics';
 import Dashboard from './pages/Dashboard';
@@ -62,6 +63,7 @@ function App() {
             }}
           />
         </div>
+        <SpeedInsights />
       </Router>
     </QueryClientProvider>
   );

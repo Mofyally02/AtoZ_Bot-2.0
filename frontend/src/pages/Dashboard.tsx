@@ -42,23 +42,23 @@ const Dashboard: React.FC = () => {
       className="space-y-6"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-secondary-900 dark:text-white">
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold text-foreground">
             AtoZ Bot Dashboard
           </h1>
-          <p className="text-secondary-600 dark:text-secondary-400 mt-1">
+          <p className="text-muted-foreground">
             Monitor and control your translation bot in real-time
           </p>
         </div>
         <div className="flex items-center space-x-4">
-          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+          <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
             botStatus?.is_running 
               ? 'bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-300'
-              : 'bg-secondary-100 text-secondary-800 dark:bg-secondary-800 dark:text-secondary-300'
+              : 'bg-muted text-muted-foreground'
           }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 inline-block ${
-              botStatus?.is_running ? 'bg-success-500 animate-pulse' : 'bg-secondary-400'
+            <div className={`w-2 h-2 rounded-full mr-2 ${
+              botStatus?.is_running ? 'bg-success-500 animate-pulse' : 'bg-muted-foreground'
             }`} />
             {botStatus?.is_running ? 'Running' : 'Stopped'}
           </div>
@@ -68,7 +68,7 @@ const Dashboard: React.FC = () => {
       {/* Metrics Grid */}
       <motion.div 
         variants={itemVariants}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
       >
         <MetricCard
           title="Total Jobs Today"
@@ -97,14 +97,14 @@ const Dashboard: React.FC = () => {
       </motion.div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
         {/* Bot Control Panel */}
-        <motion.div variants={itemVariants} className="lg:col-span-1">
+        <motion.div variants={itemVariants} className="xl:col-span-1">
           <BotControlPanel />
         </motion.div>
 
         {/* Recent Activity */}
-        <motion.div variants={itemVariants} className="lg:col-span-2">
+        <motion.div variants={itemVariants} className="xl:col-span-2">
           <Card className="p-6">
             <h2 className="text-xl font-bold text-secondary-900 dark:text-white mb-4">
               Recent Activity

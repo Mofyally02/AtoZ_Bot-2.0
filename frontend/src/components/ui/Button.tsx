@@ -17,12 +17,13 @@ const Button: React.FC<ButtonProps> = ({
   const baseClasses = 'relative inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-primary-600 hover:bg-primary-700 text-white focus:ring-primary-500 shadow-lg hover:shadow-xl',
-    secondary: 'bg-secondary-100 hover:bg-secondary-200 text-secondary-900 focus:ring-secondary-500 dark:bg-secondary-800 dark:hover:bg-secondary-700 dark:text-secondary-100',
-    success: 'bg-success-600 hover:bg-success-700 text-white focus:ring-success-500 shadow-lg hover:shadow-xl',
-    warning: 'bg-warning-600 hover:bg-warning-700 text-white focus:ring-warning-500 shadow-lg hover:shadow-xl',
-    error: 'bg-error-600 hover:bg-error-700 text-white focus:ring-error-500 shadow-lg hover:shadow-xl',
-    ghost: 'bg-transparent hover:bg-secondary-100 text-secondary-700 hover:text-secondary-900 focus:ring-secondary-500 dark:hover:bg-secondary-800 dark:text-secondary-300 dark:hover:text-secondary-100',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-ring shadow-soft hover:shadow-soft-lg',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 focus:ring-ring',
+    success: 'bg-success-600 hover:bg-success-700 text-white focus:ring-success-500 shadow-soft hover:shadow-soft-lg',
+    warning: 'bg-warning-600 hover:bg-warning-700 text-white focus:ring-warning-500 shadow-soft hover:shadow-soft-lg',
+    error: 'bg-error-600 hover:bg-error-700 text-white focus:ring-error-500 shadow-soft hover:shadow-soft-lg',
+    ghost: 'bg-transparent hover:bg-accent hover:text-accent-foreground focus:ring-ring',
+    outline: 'border border-input bg-transparent hover:bg-accent hover:text-accent-foreground focus:ring-ring',
   };
   
   const sizes = {
