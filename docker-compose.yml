@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: atoz-database
+    environment:
+      POSTGRES_DB: atoz_bot_db
+      POSTGRES_USER: atoz_user
+      POSTGRES_PASSWORD: atoz_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - atoz-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: atoz-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - atoz-network
+    restart: unless-stopped
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: atoz-backend
+    environment:
+      - DATABASE_URL=postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend:/app
+      - ./bot:/app/bot  # Mount existing bot code
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+      - redis
+    networks:
+      - atoz-network
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: atoz-frontend
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - atoz-network
+    restart: unless-stopped
+    command: npm run dev -- --host 0.0.0.0
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: atoz-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - atoz-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  atoz-network:
+    driver: bridge

@@ -45,53 +45,13 @@ A modern, comprehensive dashboard for the AtoZ translation bot with real-time an
 
 ## 🚀 Quick Start
 
-### Option 1: Automated Setup (Recommended)
+### Option 1: Docker (Recommended)
 
-#### Windows (PowerShell)
-```powershell
-# Run the setup script
-.\setup-dev.ps1
-
-# Or skip SSL generation
-.\setup-dev.ps1 -SkipSSL
-```
-
-#### Linux/macOS (Bash)
 ```bash
-# Make script executable
-chmod +x setup-dev.sh
+# Clone the repository
+git clone <repository-url>
+cd atoz-bot-dashboard
 
-# Run the setup script
-./setup-dev.sh
-```
-
-### Option 2: Manual Setup
-
-#### Prerequisites
-- Docker and Docker Compose
-- Node.js 18+ (for frontend development)
-- Python 3.11+ (for backend development)
-
-#### Step 1: Environment Configuration
-```bash
-# Copy environment template
-cp env.template .env
-
-# Edit .env with your actual values
-# Update database credentials, AtoZ credentials, etc.
-```
-
-#### Step 2: SSL Certificates (Optional)
-```bash
-# Generate development SSL certificates
-cd ssl
-./generate-dev-certs.sh  # Linux/macOS
-# or
-.\generate-dev-certs.ps1  # Windows
-```
-
-#### Step 3: Start Services
-```bash
 # Start all services
 docker-compose up -d
 
@@ -102,27 +62,30 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Option 3: Development Mode
+### Option 2: Manual Setup
 
-#### Backend Development
+#### Backend Setup
 ```bash
 cd backend
 pip install -r requirements.txt
 python main.py
 ```
 
-#### Frontend Development
+#### Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-#### Bot Development
+#### Database Setup
 ```bash
-cd bot
-pip install -r requirements.txt
-python persistent_bot.py
+# Install PostgreSQL
+# Create database
+createdb atoz_bot_db
+
+# Run schema
+psql atoz_bot_db < database/schema.sql
 ```
 
 ## 📱 Usage
@@ -157,26 +120,28 @@ python persistent_bot.py
 
 ### Environment Variables
 
-Key configuration options in your `.env` file:
+Create a `.env` file in the root directory:
 
 ```env
 # Database
-DATABASE_URL=postgresql://atoz_user:password@localhost:5432/atoz_bot_db
+DATABASE_URL=postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db
 REDIS_URL=redis://localhost:6379
 
 # Bot Configuration
-ATOZ_USERNAME=your_email@example.com
-ATOZ_PASSWORD=your_password
-REFRESH_INTERVAL_SEC=0.5
-MAX_ACCEPT_PER_RUN=5
+CHECK_INTERVAL_SEC=0.5
+RESULTS_REPORT_INTERVAL_SEC=5
+REJECTED_REPORT_INTERVAL_SEC=43200
+QUICK_CHECK_INTERVAL_SEC=10
 
 # Features
 ENABLE_QUICK_CHECK=false
 ENABLE_RESULTS_REPORTING=true
 ENABLE_REJECTED_REPORTING=true
-```
 
-See `env.template` for all available options.
+# API
+API_HOST=0.0.0.0
+API_PORT=8000
+```
 
 ### Bot Integration
 
@@ -308,8 +273,6 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## 📚 Documentation
 
-- [Bot Documentation](bot/README.md)
-- [Quick Check Features](bot/QUICK_CHECK_README.md)
 - [API Documentation](docs/API.md)
 - [Frontend Guide](docs/FRONTEND.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
@@ -342,9 +305,6 @@ For support and questions:
 - Database integration
 - Real-time analytics
 - Modern UI/UX
-- Docker support
-- SSL configuration
-- Production deployment
 
 ---
 
