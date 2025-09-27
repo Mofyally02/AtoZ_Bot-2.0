@@ -1,6 +1,0 @@
-# Minimal requirements for testing - Python 3.13 compatible
-fastapi
-uvicorn[standard]
-pydantic
-python-dotenv
-

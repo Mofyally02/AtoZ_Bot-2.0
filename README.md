@@ -1,351 +1,177 @@
-# AtoZ Bot Dashboard 🚀
+# AtoZ Bot Dashboard 2.0
 
-A modern, comprehensive dashboard for the AtoZ translation bot with real-time analytics, job management, and beautiful UI.
+A modern, streamlined dashboard for managing the AtoZ translation bot with real-time analytics and monitoring.
 
-## ✨ Features
-
-### 🎯 Core Functionality
-- **Real-time Bot Control**: Start/stop bot with one click
-- **Live Analytics**: Real-time metrics and performance tracking
-- **Job Management**: View, filter, and manage all job records
-- **Modern UI**: iPhone-inspired design with light/dark mode
-- **Database Integration**: PostgreSQL with automatic data cleanup
-- **WebSocket Support**: Real-time updates and notifications
-
-### 📊 Analytics & Reporting
-- **4-Hour Analytics**: Automated reporting every 4 hours
-- **7-Day Retention**: Automatic cleanup of old data
-- **Visual Charts**: Interactive dashboards with Chart.js
-- **Performance Metrics**: Acceptance rates, language distribution, peak hours
-- **Export Options**: CSV/JSON data export capabilities
-
-### 🔧 Technical Features
-- **TypeScript Frontend**: React 18 with modern tooling
-- **FastAPI Backend**: High-performance Python API
-- **PostgreSQL Database**: Robust data storage with indexing
-- **Redis Caching**: Fast data access and session management
-- **Docker Support**: Easy deployment and scaling
-- **WebSocket Integration**: Real-time communication
-
-## 🏗️ Architecture
+## 🏗️ Project Structure
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend       │    │   Database      │
-│   (React/TS)    │◄──►│   (FastAPI)     │◄──►│   (PostgreSQL)  │
-│   Port: 3000    │    │   Port: 8000    │    │   Port: 5432    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │              ┌─────────────────┐              │
-         └──────────────►│     Redis       │◄─────────────┘
-                        │   (Caching)     │
-                        │   Port: 6379    │
-                        └─────────────────┘
+AtoZ_Bot-2.0/
+├── backend/                 # FastAPI backend
+│   ├── app/
+│   │   ├── api/            # API endpoints
+│   │   ├── database/       # Database connection & models
+│   │   ├── models/         # SQLAlchemy models
+│   │   ├── schemas/        # Pydantic schemas
+│   │   └── services/       # Business logic
+│   ├── main.py             # Main FastAPI application
+│   ├── simple_main.py      # Simplified version for testing
+│   └── requirements.txt    # Backend dependencies
+├── frontend/               # React + TypeScript frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── pages/          # Page components
+│   │   ├── services/       # API services
+│   │   ├── stores/         # State management
+│   │   └── types/          # TypeScript types
+│   └── package.json        # Frontend dependencies
+├── bot/                    # Bot implementation
+│   ├── smart_bot.py        # Main bot logic
+│   ├── persistent_bot.py   # Persistent bot runner
+│   └── config.py           # Bot configuration
+├── database/               # Database schema
+├── docker-compose.yml      # Docker configuration
+├── requirements.txt        # Main Python dependencies
+├── start.py               # Simple startup script
+└── README.md              # This file
 ```
 
 ## 🚀 Quick Start
 
-### Option 1: Automated Setup (Recommended)
+### Prerequisites
+- Python 3.8+
+- Node.js 16+
+- PostgreSQL (optional, can run without database)
 
-#### Windows (PowerShell)
-```powershell
-# Run the setup script
-.\setup-dev.ps1
+### Installation
 
-# Or skip SSL generation
-.\setup-dev.ps1 -SkipSSL
-```
+1. **Clone and setup:**
+   ```bash
+   cd AtoZ_Bot-2.0
+   pip install -r requirements.txt
+   ```
 
-#### Linux/macOS (Bash)
-```bash
-# Make script executable
-chmod +x setup-dev.sh
+2. **Start the backend:**
+   ```bash
+   python start.py
+   # OR
+   cd backend && python main.py
+   ```
 
-# Run the setup script
-./setup-dev.sh
-```
+3. **Start the frontend (in another terminal):**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
 
-### Option 2: Manual Setup
-
-#### Prerequisites
-- Docker and Docker Compose
-- Node.js 18+ (for frontend development)
-- Python 3.11+ (for backend development)
-
-#### Step 1: Environment Configuration
-```bash
-# Copy environment template
-cp env.template .env
-
-# Edit .env with your actual values
-# Update database credentials, AtoZ credentials, etc.
-```
-
-#### Step 2: SSL Certificates (Optional)
-```bash
-# Generate development SSL certificates
-cd ssl
-./generate-dev-certs.sh  # Linux/macOS
-# or
-.\generate-dev-certs.ps1  # Windows
-```
-
-#### Step 3: Start Services
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Option 3: Development Mode
-
-#### Backend Development
-```bash
-cd backend
-pip install -r requirements.txt
-python main.py
-```
-
-#### Frontend Development
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-#### Bot Development
-```bash
-cd bot
-pip install -r requirements.txt
-python persistent_bot.py
-```
-
-## 📱 Usage
-
-### 1. Access the Dashboard
-- Open your browser to `http://localhost:3000`
-- The dashboard will automatically connect to the backend
-
-### 2. Start the Bot
-- Click "Start Bot" in the control panel
-- Enter a session name (optional)
-- Monitor real-time status and metrics
-
-### 3. View Analytics
-- Navigate to the Analytics page
-- View charts and performance metrics
-- Export data as needed
-
-### 4. Manage Jobs
-- Go to the Jobs page
-- Filter by status (accepted/rejected)
-- Search by job reference or language
-- View detailed job information
-
-### 5. Configure Settings
-- Access the Settings page
-- Adjust bot parameters
-- Toggle features on/off
-- Save your preferences
+4. **Access the dashboard:**
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
 
 ## 🔧 Configuration
 
 ### Environment Variables
-
-Key configuration options in your `.env` file:
-
+Create a `.env` file in the root directory:
 ```env
-# Database
-DATABASE_URL=postgresql://atoz_user:password@localhost:5432/atoz_bot_db
+DATABASE_URL=postgresql://user:password@localhost/atoz_bot
 REDIS_URL=redis://localhost:6379
-
-# Bot Configuration
-ATOZ_USERNAME=your_email@example.com
-ATOZ_PASSWORD=your_password
-REFRESH_INTERVAL_SEC=0.5
-MAX_ACCEPT_PER_RUN=5
-
-# Features
-ENABLE_QUICK_CHECK=false
-ENABLE_RESULTS_REPORTING=true
-ENABLE_REJECTED_REPORTING=true
+BOT_API_URL=http://localhost:8000
 ```
 
-See `env.template` for all available options.
+### Database Setup (Optional)
+The application can run without a database in simplified mode. To enable full functionality:
 
-### Bot Integration
+1. Install PostgreSQL
+2. Create database: `createdb atoz_bot`
+3. Update `DATABASE_URL` in `.env`
+4. Restart the backend
 
-To integrate with your existing bot:
+## 📡 API Endpoints
 
-```bash
-# Run the integrated bot
-python bot_integration.py
-
-# Or use the original bot (standalone)
-python persistent_bot.py
-```
-
-## 📊 Database Schema
-
-### Key Tables
-- **bot_sessions**: Bot session tracking
-- **job_records**: All job data (scraped from AtoZ)
-- **analytics_periods**: 4-hour analytics data
-- **system_logs**: Application logs
-- **bot_configurations**: Bot settings
-
-### Data Retention
-- **Analytics**: 7 days (automatic cleanup)
-- **Job Records**: 7 days (rejected/failed kept longer)
-- **System Logs**: 7 days
-- **Sessions**: Permanent (with end times)
-
-## 🎨 UI/UX Features
-
-### Design System
-- **iPhone-inspired**: Clean, modern interface
-- **Light/Dark Mode**: Automatic theme switching
-- **Responsive**: Mobile-first design
-- **Animations**: Smooth transitions with Framer Motion
-- **Accessibility**: WCAG compliant
-
-### Color Palette
-- **Primary**: Blue (#0ea5e9)
-- **Success**: Green (#22c55e)
-- **Warning**: Orange (#f59e0b)
-- **Error**: Red (#ef4444)
-- **Neutral**: Gray scale
-
-## 🔌 API Endpoints
-
-### Bot Control
-- `POST /api/bot/start` - Start bot
-- `POST /api/bot/stop` - Stop bot
+### Core Bot Control
+- `POST /api/bot/start` - Start the bot
+- `POST /api/bot/stop` - Stop the bot
 - `GET /api/bot/status` - Get bot status
 - `GET /api/bot/sessions` - Get session history
 
-### Data
-- `GET /api/bot/jobs` - Get job records
+### Analytics & Monitoring
 - `GET /api/bot/analytics` - Get analytics data
-- `GET /api/dashboard/metrics` - Get dashboard metrics
+- `GET /api/bot/jobs` - Get job records
+- `GET /api/bot/dashboard/metrics` - Get dashboard metrics
 
-### WebSocket
-- `WS /ws` - Real-time updates
+### WebSocket (Real-time Updates)
+- `WS /ws` - Real-time bot status updates
+
+## 🤖 Bot Integration
+
+The bot can be integrated with the dashboard in two ways:
+
+1. **Standalone Mode:** Run the bot independently
+2. **Integrated Mode:** Bot connects to dashboard for monitoring
+
+To run the bot:
+```bash
+cd bot
+python smart_bot.py
+```
+
+## 🐳 Docker Deployment
+
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+
+# Production deployment
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 🔍 Key Features
+
+- **Real-time Monitoring:** WebSocket-based live updates
+- **Analytics Dashboard:** Job acceptance rates, language distribution
+- **Bot Control:** Start/stop bot sessions remotely
+- **Session Management:** Track bot sessions and performance
+- **Responsive UI:** Modern React frontend with Tailwind CSS
 
 ## 🛠️ Development
-
-### Frontend Development
-```bash
-cd frontend
-npm run dev          # Start dev server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-```
 
 ### Backend Development
 ```bash
 cd backend
-python main.py       # Start dev server
-python -m pytest    # Run tests
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Database Migrations
+### Frontend Development
 ```bash
-# Create migration
-alembic revision --autogenerate -m "Description"
-
-# Apply migration
-alembic upgrade head
+cd frontend
+npm run dev
 ```
 
-## 📈 Performance
-
-### Optimization Features
-- **Database Indexing**: Optimized queries
-- **Redis Caching**: Fast data access
-- **Lazy Loading**: Efficient data loading
-- **Code Splitting**: Smaller bundle sizes
-- **Image Optimization**: Compressed assets
-
-### Monitoring
-- **Health Checks**: Service monitoring
-- **Metrics Collection**: Performance tracking
-- **Error Logging**: Comprehensive logging
-- **Real-time Updates**: Live status monitoring
-
-## 🔒 Security
-
-### Security Features
-- **CORS Protection**: Configured for production
-- **Input Validation**: Data sanitization
-- **SQL Injection Prevention**: Parameterized queries
-- **XSS Protection**: Content Security Policy
-- **Rate Limiting**: API protection
-
-## 🚀 Deployment
-
-### Production Deployment
+### Testing
 ```bash
-# Build production images
-docker-compose -f docker-compose.prod.yml build
+# Test backend API
+curl http://localhost:8000/health
 
-# Deploy to production
-docker-compose -f docker-compose.prod.yml up -d
+# Test bot integration
+cd bot && python test_quick_check.py
 ```
 
-### Environment Setup
-1. Set up PostgreSQL database
-2. Configure Redis instance
-3. Set environment variables
-4. Deploy with Docker or manually
-5. Set up reverse proxy (Nginx)
+## 📝 Notes
 
-## 📚 Documentation
+- The application includes both full-featured and simplified modes
+- Simplified mode works without database dependencies
+- All unnecessary files have been removed for cleaner structure
+- APIs are properly connected between frontend and backend
+- Database models are properly defined with relationships
 
-- [Bot Documentation](bot/README.md)
-- [Quick Check Features](bot/QUICK_CHECK_README.md)
-- [API Documentation](docs/API.md)
-- [Frontend Guide](docs/FRONTEND.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
-- [Database Schema](database/schema.sql)
+## 🆘 Troubleshooting
 
-## 🤝 Contributing
+1. **Import errors:** Make sure all dependencies are installed
+2. **Database connection:** Check PostgreSQL is running and credentials are correct
+3. **Port conflicts:** Change ports in configuration if needed
+4. **Bot not starting:** Check bot configuration and permissions
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+## 📞 Support
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the documentation
-- Review the troubleshooting guide
-
-## 🔄 Changelog
-
-### v1.0.0
-- Initial release
-- Complete dashboard implementation
-- Database integration
-- Real-time analytics
-- Modern UI/UX
-- Docker support
-- SSL configuration
-- Production deployment
-
----
-
-**Built with ❤️ for the AtoZ translation bot community**
+For issues or questions, check the logs in the backend console or create an issue in the repository.
