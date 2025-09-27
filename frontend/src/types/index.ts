@@ -49,6 +49,7 @@ export interface BotStatus {
   session_id?: string;
   session_name?: string;
   start_time?: string;
+  status: 'running' | 'stopped' | 'error' | 'starting';
   login_status: string;
   total_checks: number;
   total_accepted: number;
@@ -98,7 +99,7 @@ export interface WebSocketMessage {
 }
 
 export interface RealtimeUpdate {
-  type: 'job_accepted' | 'job_rejected' | 'status_change' | 'metric_update' | 'analytics_update';
+  type: 'job_accepted' | 'job_rejected' | 'status_change' | 'status_update' | 'metric_update' | 'analytics_update';
   data: Record<string, any>;
   timestamp: string;
 }

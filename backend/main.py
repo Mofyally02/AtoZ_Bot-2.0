@@ -13,9 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api.bot_control import router as bot_router
-from backend.app.database.connection import Base, engine
-from backend.app.services.bot_service import BotService
+from app.api.bot_control import router as bot_router
+from app.database.connection import Base, engine
+from app.services.bot_service import BotService
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -90,19 +90,47 @@ async def websocket_endpoint(websocket: WebSocket):
             await asyncio.sleep(5)  # Update every 5 seconds
             
             # Get current bot status and metrics
-            # This would integrate with the existing bot system
-            update_data = {
-                "type": "status_update",
-                "data": {
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "message": "Bot is running normally"
-                }
-            }
+            from app.database.connection import SessionLocal
+            db = SessionLocal()
             
-            await manager.send_personal_message(
-                json.dumps(update_data), 
-                websocket
-            )
+            try:
+                # Get bot status
+                from app.api.bot_control import get_bot_status
+                bot_status = await get_bot_status(db)
+                
+                # Get dashboard metrics
+                dashboard_metrics = bot_service.get_dashboard_metrics(db)
+                
+                # Send comprehensive update
+                update_data = {
+                    "type": "status_update",
+                    "data": {
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "bot_status": {
+                            "is_running": bot_status.is_running,
+                            "session_id": bot_status.session_id,
+                            "session_name": bot_status.session_name,
+                            "login_status": bot_status.login_status,
+                            "total_checks": bot_status.total_checks,
+                            "total_accepted": bot_status.total_accepted,
+                            "total_rejected": bot_status.total_rejected
+                        },
+                        "dashboard_metrics": dashboard_metrics
+                    }
+                }
+                
+                # Only send if websocket is still connected
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    await manager.send_personal_message(
+                        json.dumps(update_data), 
+                        websocket
+                    )
+                
+            except Exception as e:
+                print(f"Error in WebSocket update: {e}")
+                break
+            finally:
+                db.close()
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
@@ -127,7 +155,7 @@ async def periodic_analytics():
         await asyncio.sleep(4 * 3600)  # Wait 4 hours
         
         # Create analytics period
-        from backend.app.database.connection import SessionLocal
+        from app.database.connection import SessionLocal
         db = SessionLocal()
         
         try:
@@ -135,7 +163,7 @@ async def periodic_analytics():
             start_time = end_time.replace(hour=(end_time.hour // 4) * 4, minute=0, second=0, microsecond=0)
             
             # Check if period already exists
-            from backend.app.models.bot_models import AnalyticsPeriod
+            from app.models.bot_models import AnalyticsPeriod
             existing = db.query(AnalyticsPeriod).filter(
                 AnalyticsPeriod.period_start == start_time
             ).first()
@@ -164,7 +192,7 @@ async def periodic_cleanup():
     while True:
         await asyncio.sleep(24 * 3600)  # Wait 24 hours
         
-        from backend.app.database.connection import SessionLocal
+        from app.database.connection import SessionLocal
         db = SessionLocal()
         
         try:

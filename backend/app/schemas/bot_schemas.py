@@ -13,6 +13,10 @@ class BotControlRequest(BaseModel):
     session_name: Optional[str] = None
     config_id: Optional[str] = None
 
+class BotSessionCreate(BaseModel):
+    session_name: str
+    config_id: Optional[str] = None
+
 class JobRecordCreate(BaseModel):
     job_ref: str
     language: str

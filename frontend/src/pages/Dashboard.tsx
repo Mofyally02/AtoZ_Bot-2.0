@@ -4,20 +4,48 @@ import {
     CheckCircle,
     Clock,
     Globe,
+    RefreshCw,
+    Settings,
     TrendingUp,
     XCircle,
     Zap
 } from 'lucide-react';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BotControlPanel from '../components/dashboard/BotControlPanel';
+import ConnectionTest from '../components/ConnectionTest';
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useBotStore } from '../stores/botStore';
 
 const Dashboard: React.FC = () => {
-  const { botStatus, theme } = useBotStore();
-  const { dashboardMetrics } = useAnalyticsStore();
+  const { botStatus, refreshStatus, isWebSocketConnected, error } = useBotStore();
+  const { dashboardMetrics, refreshAll, isLoading } = useAnalyticsStore();
+  const navigate = useNavigate();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Load initial data
+  useEffect(() => {
+    refreshAll();
+    refreshStatus();
+  }, [refreshAll, refreshStatus]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        refreshAll(),
+        refreshStatus(),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleSettingsClick = () => {
+    navigate('/settings');
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -41,6 +69,26 @@ const Dashboard: React.FC = () => {
       animate="visible"
       className="space-y-6"
     >
+      {/* Error Display */}
+      {error && (
+        <motion.div 
+          variants={itemVariants}
+          className="p-4 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg"
+        >
+          <div className="flex items-center space-x-3">
+            <XCircle className="w-5 h-5 text-error-600" />
+            <div>
+              <p className="text-sm font-medium text-error-800 dark:text-error-200">
+                Connection Error
+              </p>
+              <p className="text-xs text-error-700 dark:text-error-300">
+                {error}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -52,15 +100,48 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-4">
-          <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
-            botStatus?.is_running 
-              ? 'bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-300'
-              : 'bg-muted text-muted-foreground'
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              botStatus?.is_running ? 'bg-success-500 animate-pulse' : 'bg-muted-foreground'
-            }`} />
-            {botStatus?.is_running ? 'Running' : 'Stopped'}
+          <div className="flex items-center space-x-2">
+            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+              botStatus?.is_running 
+                ? 'bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-300'
+                : 'bg-muted text-muted-foreground'
+            }`}>
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                botStatus?.is_running ? 'bg-success-500 animate-pulse' : 'bg-muted-foreground'
+              }`} />
+              {botStatus?.is_running ? 'Running' : 'Stopped'}
+            </div>
+            
+            {/* WebSocket Connection Status */}
+            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+              isWebSocketConnected 
+                ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300'
+                : 'bg-warning-100 text-warning-800 dark:bg-warning-900/30 dark:text-warning-300'
+            }`}>
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                isWebSocketConnected ? 'bg-primary-500' : 'bg-warning-500'
+              }`} />
+              {isWebSocketConnected ? 'Live' : 'Offline'}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleSettingsClick}
+              className="p-2 rounded-lg bg-card border border-border hover:bg-accent hover:text-accent-foreground transition-colors duration-200"
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing || isLoading}
+              className="p-2 rounded-lg bg-card border border-border hover:bg-accent hover:text-accent-foreground transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
       </motion.div>
@@ -99,8 +180,9 @@ const Dashboard: React.FC = () => {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
         {/* Bot Control Panel */}
-        <motion.div variants={itemVariants} className="xl:col-span-1">
+        <motion.div variants={itemVariants} className="xl:col-span-1 space-y-6">
           <BotControlPanel />
+          <ConnectionTest />
         </motion.div>
 
         {/* Recent Activity */}

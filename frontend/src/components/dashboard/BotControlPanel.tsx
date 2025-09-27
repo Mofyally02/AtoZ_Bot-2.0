@@ -6,31 +6,31 @@ import Button from '../ui/Button';
 import Card from '../ui/Card';
 
 const BotControlPanel: React.FC = () => {
-  const { botStatus, startBot, stopBot, refreshStatus } = useBotStore();
+  const { 
+    botStatus, 
+    startBot, 
+    stopBot, 
+    refreshStatus, 
+    isLoading, 
+    error, 
+    isWebSocketConnected 
+  } = useBotStore();
   const [sessionName, setSessionName] = useState('');
-  const [isStarting, setIsStarting] = useState(false);
-  const [isStopping, setIsStopping] = useState(false);
 
   const handleStart = async () => {
-    setIsStarting(true);
     try {
       await startBot(sessionName || undefined);
       setSessionName('');
     } catch (error) {
       console.error('Failed to start bot:', error);
-    } finally {
-      setIsStarting(false);
     }
   };
 
   const handleStop = async () => {
-    setIsStopping(true);
     try {
       await stopBot();
     } catch (error) {
       console.error('Failed to stop bot:', error);
-    } finally {
-      setIsStopping(false);
     }
   };
 
@@ -74,6 +74,13 @@ const BotControlPanel: React.FC = () => {
         </Button>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg">
+          <p className="text-sm text-error-800 dark:text-error-200">{error}</p>
+        </div>
+      )}
+
       {/* Status Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="space-y-2">
@@ -82,6 +89,9 @@ const BotControlPanel: React.FC = () => {
             <span className="text-sm font-medium text-secondary-600 dark:text-secondary-400">
               Bot Status
             </span>
+            {isWebSocketConnected && (
+              <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse" title="Real-time updates active" />
+            )}
           </div>
           <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(botStatus?.status || 'stopped')}`}>
             <div className={`w-2 h-2 rounded-full mr-2 ${
@@ -172,8 +182,8 @@ const BotControlPanel: React.FC = () => {
               </div>
               <Button
                 onClick={handleStart}
-                loading={isStarting}
-                disabled={isStarting}
+                loading={isLoading}
+                disabled={isLoading}
                 className="w-full"
                 size="lg"
               >
@@ -190,8 +200,8 @@ const BotControlPanel: React.FC = () => {
             >
               <Button
                 onClick={handleStop}
-                loading={isStopping}
-                disabled={isStopping}
+                loading={isLoading}
+                disabled={isLoading}
                 variant="error"
                 className="w-full"
                 size="lg"

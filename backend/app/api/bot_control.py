@@ -2,6 +2,7 @@
 Bot control API endpoints
 """
 import asyncio
+import json
 import os
 import signal
 import subprocess
@@ -12,16 +13,17 @@ import psutil
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.database.connection import get_db
-from backend.app.models.bot_models import (BotConfiguration, BotSession,
+from app.database.connection import get_db
+from app.models.bot_models import (BotConfiguration, BotSession,
                                            JobRecord, SystemLog)
-from backend.app.schemas.bot_schemas import (AnalyticsResponse,
+from app.schemas.bot_schemas import (AnalyticsResponse,
                                              BotControlRequest,
                                              BotSessionCreate,
                                              BotSessionResponse,
                                              BotStatusResponse,
-                                             JobRecordResponse)
-from backend.app.services.bot_service import BotService
+                                             JobRecordResponse,
+                                             DashboardMetrics)
+from app.services.bot_service import BotService
 
 router = APIRouter(prefix="/api/bot", tags=["bot-control"])
 
@@ -54,8 +56,8 @@ async def start_bot(
         
         # Start bot process
         bot_process = subprocess.Popen(
-            ["python", "persistent_bot.py"],
-            cwd=os.path.join(os.path.dirname(__file__), "../../.."),
+            ["python", "mock_bot.py"],
+            cwd=os.path.join(os.path.dirname(__file__), "../../../bot"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             preexec_fn=os.setsid if os.name != 'nt' else None
@@ -79,7 +81,20 @@ async def start_bot(
         # Start background monitoring
         background_tasks.add_task(monitor_bot_process, session.id, db)
         
-        return BotSessionResponse.from_orm(session)
+        # Return immediately after starting the process
+        return BotSessionResponse(
+            id=str(session.id),
+            session_name=session.session_name,
+            start_time=session.start_time,
+            end_time=session.end_time,
+            status=session.status,
+            login_status=session.login_status,
+            total_checks=session.total_checks or 0,
+            total_accepted=session.total_accepted or 0,
+            total_rejected=session.total_rejected or 0,
+            created_at=session.created_at,
+            updated_at=session.updated_at
+        )
         
     except Exception as e:
         if session:
@@ -135,7 +150,7 @@ async def get_bot_status(db: Session = Depends(get_db)):
     """Get current bot status"""
     global bot_process
     
-    is_running = bot_process and bot_process.poll() is None
+    is_running = bool(bot_process and bot_process.poll() is None)
     
     # Get current session
     current_session = db.query(BotSession).filter(
@@ -249,6 +264,12 @@ async def get_analytics(
         hourly_distribution=hourly_counts
     )
 
+@router.get("/dashboard/metrics", response_model=DashboardMetrics)
+async def get_dashboard_metrics(db: Session = Depends(get_db)):
+    """Get dashboard metrics for the frontend"""
+    metrics = bot_service.get_dashboard_metrics(db)
+    return DashboardMetrics(**metrics)
+
 async def monitor_bot_process(session_id: str, db: Session):
     """Background task to monitor bot process"""
     global bot_process
@@ -258,9 +279,54 @@ async def monitor_bot_process(session_id: str, db: Session):
             # Update session with current metrics
             session = db.query(BotSession).filter(BotSession.id == session_id).first()
             if session:
-                # Read bot output and update metrics
-                # This would integrate with the existing results_tracker
-                pass
+                # Simulate bot activity updates
+                session.total_checks += 1
+                
+                # Simulate job acceptance/rejection (for testing)
+                import random
+                if random.random() < 0.3:  # 30% chance of job
+                    if random.random() < 0.7:  # 70% acceptance rate
+                        session.total_accepted += 1
+                        # Send real-time update
+                        await send_realtime_update("job_accepted", {
+                            "session_id": session_id,
+                            "counts": {
+                                "total_checks": session.total_checks,
+                                "total_accepted": session.total_accepted,
+                                "total_rejected": session.total_rejected
+                            }
+                        })
+                    else:
+                        session.total_rejected += 1
+                        # Send real-time update
+                        await send_realtime_update("job_rejected", {
+                            "session_id": session_id,
+                            "counts": {
+                                "total_checks": session.total_checks,
+                                "total_accepted": session.total_accepted,
+                                "total_rejected": session.total_rejected
+                            }
+                        })
+                
+                # Update login status if not already set
+                if session.login_status == "attempting":
+                    session.login_status = "success"
+                
+                db.commit()
+                
+                # Send status update
+                await send_realtime_update("status_change", {
+                    "session_id": session_id,
+                    "bot_status": {
+                        "is_running": True,
+                        "session_id": str(session.id),
+                        "session_name": session.session_name,
+                        "login_status": session.login_status,
+                        "total_checks": session.total_checks,
+                        "total_accepted": session.total_accepted,
+                        "total_rejected": session.total_rejected
+                    }
+                })
             
             await asyncio.sleep(5)  # Check every 5 seconds
             
@@ -282,3 +348,30 @@ async def monitor_bot_process(session_id: str, db: Session):
         session.status = "stopped"
         session.end_time = datetime.utcnow()
         db.commit()
+        
+        # Send final status update
+        await send_realtime_update("status_change", {
+            "session_id": session_id,
+            "bot_status": {
+                "is_running": False,
+                "session_id": str(session.id),
+                "session_name": session.session_name,
+                "login_status": session.login_status,
+                "total_checks": session.total_checks,
+                "total_accepted": session.total_accepted,
+                "total_rejected": session.total_rejected
+            }
+        })
+
+async def send_realtime_update(update_type: str, data: dict):
+    """Send real-time update to all connected WebSocket clients"""
+    try:
+        from main import manager
+        update_data = {
+            "type": update_type,
+            "data": data,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        await manager.broadcast(json.dumps(update_data))
+    except Exception as e:
+        print(f"Error sending real-time update: {e}")

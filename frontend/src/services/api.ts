@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -84,7 +84,18 @@ export const apiService = {
 
   // Dashboard Metrics
   async getDashboardMetrics(): Promise<DashboardMetrics> {
-    const response = await apiClient.get('/api/dashboard/metrics');
+    const response = await apiClient.get('/api/bot/dashboard/metrics');
+    return response.data;
+  },
+
+  // Bot Configuration
+  async getBotConfiguration(): Promise<any> {
+    const response = await apiClient.get('/api/bot/configuration');
+    return response.data;
+  },
+
+  async updateBotConfiguration(config: any): Promise<any> {
+    const response = await apiClient.put('/api/bot/configuration', config);
     return response.data;
   },
 

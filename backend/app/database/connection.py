@@ -12,15 +12,15 @@ from sqlalchemy.pool import StaticPool
 # Database URLs
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db"
+    "postgresql+psycopg2://mofy@/atoz_bot"
 )
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 # Create SQLAlchemy engine
 engine = create_engine(
     DATABASE_URL,
-    poolclass=StaticPool,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 # Create session factory

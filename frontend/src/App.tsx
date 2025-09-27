@@ -23,7 +23,7 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { theme, refreshStatus } = useBotStore();
+  const { theme, refreshStatus, connectWebSocket, disconnectWebSocket } = useBotStore();
 
   useEffect(() => {
     // Apply theme on mount
@@ -32,11 +32,17 @@ function App() {
     // Refresh bot status on mount
     refreshStatus();
     
-    // Set up periodic status refresh
+    // Connect to WebSocket for real-time updates
+    connectWebSocket();
+    
+    // Set up periodic status refresh as fallback
     const interval = setInterval(refreshStatus, 30000); // Every 30 seconds
     
-    return () => clearInterval(interval);
-  }, [theme, refreshStatus]);
+    return () => {
+      clearInterval(interval);
+      disconnectWebSocket();
+    };
+  }, [theme, refreshStatus, connectWebSocket, disconnectWebSocket]);
 
   return (
     <QueryClientProvider client={queryClient}>
