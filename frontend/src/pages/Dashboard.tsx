@@ -177,16 +177,14 @@ const Dashboard: React.FC = () => {
         />
       </motion.div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6">
-        {/* Bot Control Panel */}
-        <motion.div variants={itemVariants} className="xl:col-span-1 space-y-6">
-          <BotControlPanel />
-          <ConnectionTest />
-        </motion.div>
+      {/* Bot Control and Connection Status - Horizontal Layout */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <BotControlPanel />
+        <ConnectionTest />
+      </motion.div>
 
-        {/* Recent Activity */}
-        <motion.div variants={itemVariants} className="xl:col-span-2">
+      {/* Recent Activity */}
+      <motion.div variants={itemVariants} className="w-full">
           <Card className="p-6">
             <h2 className="text-xl font-bold text-secondary-900 dark:text-white mb-4">
               Recent Activity
@@ -267,7 +265,6 @@ const Dashboard: React.FC = () => {
             )}
           </Card>
         </motion.div>
-      </div>
 
       {/* Quick Stats */}
       <motion.div variants={itemVariants}>
