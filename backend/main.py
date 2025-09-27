@@ -6,9 +6,11 @@ import json
 import os
 from datetime import datetime
 from typing import List
+from uuid import UUID
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +22,15 @@ from app.services.bot_service import BotService
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Custom JSON encoder to handle UUIDs and datetimes
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, UUID):
+            return str(obj)
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
 # Initialize FastAPI app
 app = FastAPI(
     title="AtoZ Bot Dashboard",
@@ -30,7 +41,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,14 +63,31 @@ class ConnectionManager:
         self.active_connections.remove(websocket)
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(message)
+        except Exception as e:
+            # Silently handle closed connections
+            if "Cannot call" not in str(e) and "close message" not in str(e):
+                print(f"Error sending personal message: {e}")
 
     async def broadcast(self, message: str):
+        disconnected_connections = []
         for connection in self.active_connections:
             try:
-                await connection.send_text(message)
-            except:
-                # Remove broken connections
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_text(message)
+                else:
+                    disconnected_connections.append(connection)
+            except Exception as e:
+                # Silently handle closed connections
+                if "Cannot call" not in str(e) and "close message" not in str(e):
+                    print(f"Error broadcasting to connection: {e}")
+                disconnected_connections.append(connection)
+        
+        # Remove broken connections
+        for connection in disconnected_connections:
+            if connection in self.active_connections:
                 self.active_connections.remove(connection)
 
 manager = ConnectionManager()
@@ -86,54 +114,69 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
-            # Send periodic updates
-            await asyncio.sleep(5)  # Update every 5 seconds
-            
-            # Get current bot status and metrics
-            from app.database.connection import SessionLocal
-            db = SessionLocal()
-            
             try:
-                # Get bot status
-                from app.api.bot_control import get_bot_status
-                bot_status = await get_bot_status(db)
+                # Send periodic updates
+                await asyncio.sleep(5)  # Update every 5 seconds
                 
-                # Get dashboard metrics
-                dashboard_metrics = bot_service.get_dashboard_metrics(db)
+                # Check if websocket is still connected
+                if websocket.client_state != WebSocketState.CONNECTED:
+                    break
                 
-                # Send comprehensive update
-                update_data = {
-                    "type": "status_update",
-                    "data": {
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "bot_status": {
-                            "is_running": bot_status.is_running,
-                            "session_id": bot_status.session_id,
-                            "session_name": bot_status.session_name,
-                            "login_status": bot_status.login_status,
-                            "total_checks": bot_status.total_checks,
-                            "total_accepted": bot_status.total_accepted,
-                            "total_rejected": bot_status.total_rejected
-                        },
-                        "dashboard_metrics": dashboard_metrics
+                # Get current bot status and metrics
+                from app.database.connection import SessionLocal
+                db = SessionLocal()
+                
+                try:
+                    # Get bot status
+                    from app.api.bot_control import get_bot_status
+                    bot_status = await get_bot_status(db)
+                    
+                    # Get dashboard metrics
+                    dashboard_metrics = bot_service.get_dashboard_metrics(db)
+                    
+                    # Send comprehensive update
+                    update_data = {
+                        "type": "status_update",
+                        "data": {
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "bot_status": {
+                                "is_running": bot_status.is_running,
+                                "session_id": bot_status.session_id,
+                                "session_name": bot_status.session_name,
+                                "login_status": bot_status.login_status,
+                                "total_checks": bot_status.total_checks,
+                                "total_accepted": bot_status.total_accepted,
+                                "total_rejected": bot_status.total_rejected
+                            },
+                            "dashboard_metrics": dashboard_metrics
+                        }
                     }
-                }
-                
-                # Only send if websocket is still connected
-                if websocket.client_state == WebSocketState.CONNECTED:
+                    
                     await manager.send_personal_message(
-                        json.dumps(update_data), 
+                        json.dumps(update_data, cls=CustomJSONEncoder), 
                         websocket
                     )
-                
-            except Exception as e:
-                print(f"Error in WebSocket update: {e}")
+                    
+                except Exception as e:
+                    print(f"Error in WebSocket update: {e}")
+                finally:
+                    db.close()
+                    
+            except WebSocketDisconnect:
                 break
-            finally:
-                db.close()
-            
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+            except Exception as e:
+                if "Cannot call" not in str(e) and "close message" not in str(e):
+                    print(f"WebSocket error: {e}")
+                break
+                
+    except Exception as e:
+        if "Cannot call" not in str(e) and "close message" not in str(e):
+            print(f"WebSocket connection error: {e}")
+    finally:
+        try:
+            manager.disconnect(websocket)
+        except:
+            pass
 
 @app.on_event("startup")
 async def startup_event():
@@ -180,7 +223,7 @@ async def periodic_analytics():
                         "period_end": end_time.isoformat()
                     }
                 }
-                await manager.broadcast(json.dumps(update_data))
+                await manager.broadcast(json.dumps(update_data, cls=CustomJSONEncoder))
                 
         except Exception as e:
             print(f"Error creating analytics period: {e}")
