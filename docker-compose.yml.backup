@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # Main Application Service (what Coolify will deploy)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atoz-bot-app
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - PYTHONPATH=/app
+      - ENVIRONMENT=production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./bot:/app/bot
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+      - redis
+    networks:
+      - atoz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: atoz-database
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-atoz_bot_db}
+      POSTGRES_USER: ${POSTGRES_USER:-atoz_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atoz_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - atoz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atoz_user} -d ${POSTGRES_DB:-atoz_bot_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: atoz-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - atoz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  atoz-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
