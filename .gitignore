@@ -1,4 +1,4 @@
 node_modules
 
 # Temporary Coolify directory structure
-docker-compose.yml/
+coolify/
