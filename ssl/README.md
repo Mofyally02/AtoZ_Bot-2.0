@@ -43,5 +43,5 @@ ssl/
 
 ## Docker Usage
 
-The nginx container will automatically use these certificates when configured with the docker-compose.yml file.
+The nginx container will automatically use these certificates when configured with the docker-compose.dev.yml file.
 

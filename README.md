@@ -29,7 +29,8 @@ AtoZ_Bot-2.0/
 │   ├── persistent_bot.py   # Persistent bot runner
 │   └── config.py           # Bot configuration
 ├── database/               # Database schema
-├── docker-compose.yml      # Docker configuration
+├── docker-compose.yml      # Docker configuration for Coolify deployment
+├── docker-compose.dev.yml  # Docker configuration for development
 ├── requirements.txt        # Main Python dependencies
 ├── start.py               # Simple startup script
 └── README.md              # This file

@@ -35,7 +35,7 @@ atoz-bot-dashboard/
 │   ├── results_tracker.py
 │   └── ...
 ├── docker/                  # Docker Configuration
-│   ├── docker-compose.yml
+│   ├── docker-compose.dev.yml
 │   ├── Dockerfile.frontend
 │   ├── Dockerfile.backend
 │   └── Dockerfile.database
