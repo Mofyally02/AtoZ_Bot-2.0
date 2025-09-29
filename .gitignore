@@ -2,3 +2,4 @@ node_modules
 
 # Temporary deployment directory structure
 app/
+docker-compose.yml/
