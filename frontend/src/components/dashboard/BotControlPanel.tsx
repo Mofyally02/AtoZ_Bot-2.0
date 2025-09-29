@@ -13,7 +13,9 @@ const BotControlPanel: React.FC = () => {
     refreshStatus, 
     isLoading, 
     error, 
-    isWebSocketConnected 
+    isWebSocketConnected,
+    startupStatus,
+    startupMessage
   } = useBotStore();
   const [sessionName, setSessionName] = useState('');
 
@@ -78,6 +80,53 @@ const BotControlPanel: React.FC = () => {
       {error && (
         <div className="mb-4 p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg">
           <p className="text-sm text-error-800 dark:text-error-200">{error}</p>
+        </div>
+      )}
+
+      {/* Startup Status Display */}
+      {startupStatus && (
+        <div className={`mb-4 p-4 rounded-lg border ${
+          startupStatus === 'error' || startupStatus === 'connection_error' || startupStatus === 'login_error' 
+            ? 'bg-error-50 dark:bg-error-900/20 border-error-200 dark:border-error-800' 
+            : startupStatus === 'logged_in' || startupStatus === 'bot_running'
+            ? 'bg-success-50 dark:bg-success-900/20 border-success-200 dark:border-success-800'
+            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+        }`}>
+          <div className="flex items-center space-x-3">
+            <div className={`w-3 h-3 rounded-full ${
+              startupStatus === 'error' || startupStatus === 'connection_error' || startupStatus === 'login_error'
+                ? 'bg-error-500'
+                : startupStatus === 'logged_in' || startupStatus === 'bot_running'
+                ? 'bg-success-500'
+                : 'bg-blue-500 animate-pulse'
+            }`} />
+            <div>
+              <p className={`text-sm font-medium ${
+                startupStatus === 'error' || startupStatus === 'connection_error' || startupStatus === 'login_error'
+                  ? 'text-error-800 dark:text-error-200'
+                  : startupStatus === 'logged_in' || startupStatus === 'bot_running'
+                  ? 'text-success-800 dark:text-success-200'
+                  : 'text-blue-800 dark:text-blue-200'
+              }`}>
+                {startupMessage || 'Processing...'}
+              </p>
+              {startupStatus === 'checking_connections' && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  Verifying database, API, and WebSocket connections...
+                </p>
+              )}
+              {startupStatus === 'starting_bot' && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  Initializing bot process...
+                </p>
+              )}
+              {startupStatus === 'logging_in' && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  Attempting to log into AtoZ platform...
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

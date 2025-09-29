@@ -23,11 +23,11 @@ ATOZ_INTERPRETER_JOBS_PATH = os.getenv("ATOZ_INTERPRETER_JOBS_PATH", "/interpret
 
 # Bot configuration
 BOT_CONFIG = {
-    "check_interval": float(os.getenv("REFRESH_INTERVAL_SEC", "0.5")),
-    "quick_check_interval": float(os.getenv("QUICK_CHECK_INTERVAL_SEC", "10")),  # 10-second job checking
-    "results_report_interval": float(os.getenv("RESULTS_REPORT_INTERVAL_SEC", "5")),  # 5-second results reporting
+    "check_interval": float(os.getenv("REFRESH_INTERVAL_SEC", "0.5")),  # 0.5-second checks
+    "quick_check_interval": float(os.getenv("QUICK_CHECK_INTERVAL_SEC", "2")),  # 2-second job checking
+    "results_report_interval": float(os.getenv("RESULTS_REPORT_INTERVAL_SEC", "1")),  # 1-second results reporting
     "rejected_report_interval": float(os.getenv("REJECTED_REPORT_INTERVAL_SEC", "43200")),  # 12-hour rejected jobs reporting (43200 seconds)
-    "enable_quick_check": os.getenv("ENABLE_QUICK_CHECK", "false").lower() in ("1", "true", "yes"),
+    "enable_quick_check": os.getenv("ENABLE_QUICK_CHECK", "true").lower() in ("1", "true", "yes"),
     "enable_results_reporting": os.getenv("ENABLE_RESULTS_REPORTING", "true").lower() in ("1", "true", "yes"),
     "enable_rejected_reporting": os.getenv("ENABLE_REJECTED_REPORTING", "true").lower() in ("1", "true", "yes"),
     "headless": os.getenv("HEADLESS", "true").lower() in ("1", "true", "yes"),

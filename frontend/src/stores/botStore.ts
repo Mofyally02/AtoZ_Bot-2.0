@@ -12,6 +12,8 @@ interface BotStore {
   theme: Theme;
   error: string | null;
   isLoading: boolean;
+  startupStatus: string | null;
+  startupMessage: string | null;
   
   // Actions
   setBotStatus: (status: BotStatus) => void;
@@ -20,6 +22,7 @@ interface BotStore {
   setWebSocketConnected: (connected: boolean) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  setStartupStatus: (status: string | null, message?: string | null) => void;
   toggleTheme: () => void;
   startBot: (sessionName?: string) => Promise<void>;
   stopBot: () => Promise<void>;
@@ -38,6 +41,8 @@ export const useBotStore = create<BotStore>((set, get) => ({
   theme: (localStorage.getItem('theme') as Theme) || 'light',
   error: null,
   isLoading: false,
+  startupStatus: null,
+  startupMessage: null,
   
   // Actions
   setBotStatus: (status) => set({ botStatus: status }),
@@ -52,6 +57,11 @@ export const useBotStore = create<BotStore>((set, get) => ({
   
   setLoading: (loading) => set({ isLoading: loading }),
   
+  setStartupStatus: (status, message) => set({ 
+    startupStatus: status, 
+    startupMessage: message || null 
+  }),
+  
   toggleTheme: () => {
     const newTheme = get().theme === 'light' ? 'dark' : 'light';
     set({ theme: newTheme });
@@ -59,25 +69,31 @@ export const useBotStore = create<BotStore>((set, get) => ({
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   },
   
-  startBot: async (sessionName?: string) => {
-    const { setLoading, setError, refreshStatus } = get();
+  startBot: async () => {
+    const { setLoading, setError, setStartupStatus, refreshStatus } = get();
     
     try {
       setLoading(true);
       setError(null);
+      setStartupStatus('checking_connections', 'Checking all connections...');
       
-      const response = await apiService.startBot({ session_name: sessionName });
-      set({ currentSession: response });
+      const response = await apiService.startBot();
       
-      // Refresh status to get updated bot information
-      await refreshStatus();
-      
-      // Connect to WebSocket for real-time updates
-      await get().connectWebSocket();
+      if (response.running) {
+        setStartupStatus('bot_running', 'Bot started successfully');
+        // Refresh status to get updated bot information
+        await refreshStatus();
+        // Connect to WebSocket for real-time updates
+        await get().connectWebSocket();
+      } else {
+        setError('Failed to start bot');
+        setStartupStatus('error', 'Failed to start bot');
+      }
       
     } catch (error: any) {
       console.error('Failed to start bot:', error);
       setError(error.message || 'Failed to start bot');
+      setStartupStatus('error', error.message || 'Failed to start bot');
       throw error;
     } finally {
       setLoading(false);
@@ -91,14 +107,17 @@ export const useBotStore = create<BotStore>((set, get) => ({
       setLoading(true);
       setError(null);
       
-      await apiService.stopBot();
-      set({ currentSession: null });
+      const response = await apiService.stopBot();
       
-      // Disconnect WebSocket
-      disconnectWebSocket();
-      
-      // Refresh status to get updated bot information
-      await refreshStatus();
+      if (!response.running) {
+        set({ currentSession: null });
+        // Disconnect WebSocket
+        disconnectWebSocket();
+        // Refresh status to get updated bot information
+        await refreshStatus();
+      } else {
+        setError('Failed to stop bot');
+      }
       
     } catch (error: any) {
       console.error('Failed to stop bot:', error);
@@ -146,12 +165,57 @@ export const useBotStore = create<BotStore>((set, get) => ({
         get().handleRealtimeUpdate({ type: 'metric_update', data, timestamp: new Date().toISOString() });
       });
       
+      // Subscribe to smart bot updates
+      wsService.subscribe('starting', (data) => {
+        get().handleRealtimeUpdate({ type: 'starting', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('login_attempting', (data) => {
+        get().handleRealtimeUpdate({ type: 'login_attempting', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('running', (data) => {
+        get().handleRealtimeUpdate({ type: 'running', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('cycle_complete', (data) => {
+        get().handleRealtimeUpdate({ type: 'cycle_complete', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('database_update', (data) => {
+        get().handleRealtimeUpdate({ type: 'database_update', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('stopped', (data) => {
+        get().handleRealtimeUpdate({ type: 'stopped', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('error', (data) => {
+        get().handleRealtimeUpdate({ type: 'error', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('bot_stopping', (data) => {
+        get().handleRealtimeUpdate({ type: 'bot_stopping', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('bot_stopped', (data) => {
+        get().handleRealtimeUpdate({ type: 'bot_stopped', data, timestamp: new Date().toISOString() });
+      });
+      
       wsService.subscribe('job_accepted', (data) => {
         get().handleRealtimeUpdate({ type: 'job_accepted', data, timestamp: new Date().toISOString() });
       });
       
       wsService.subscribe('job_rejected', (data) => {
         get().handleRealtimeUpdate({ type: 'job_rejected', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('checking_jobs', (data) => {
+        get().handleRealtimeUpdate({ type: 'checking_jobs', data, timestamp: new Date().toISOString() });
+      });
+      
+      wsService.subscribe('job_processing_complete', (data) => {
+        get().handleRealtimeUpdate({ type: 'job_processing_complete', data, timestamp: new Date().toISOString() });
       });
       
       wsService.subscribe('analytics_update', (data) => {
@@ -171,9 +235,113 @@ export const useBotStore = create<BotStore>((set, get) => ({
   },
   
   handleRealtimeUpdate: (update: RealtimeUpdate) => {
-    const { botStatus, setBotStatus } = get();
+    const { botStatus, setBotStatus, setStartupStatus } = get();
     
     switch (update.type) {
+      case 'connection_check':
+        if (update.data.status === 'success') {
+          setStartupStatus('connections_verified', update.data.message);
+        } else {
+          setStartupStatus('connection_error', update.data.message);
+        }
+        break;
+        
+      case 'bot_starting':
+        setStartupStatus('starting_bot', update.data.message);
+        break;
+        
+      case 'bot_started':
+        setStartupStatus('bot_running', update.data.message);
+        break;
+        
+      case 'bot_error':
+        setStartupStatus('error', update.data.message);
+        break;
+        
+      case 'login_attempt':
+        setStartupStatus('logging_in', 'Attempting to log in...');
+        break;
+        
+      case 'login_success':
+        setStartupStatus('logged_in', 'Successfully logged in! Bot is now running...');
+        break;
+        
+      case 'login_failed':
+        setStartupStatus('login_error', 'Login failed. Please check credentials.');
+        break;
+        
+      case 'starting':
+        setStartupStatus('starting_bot', update.data.message || 'Bot is starting...');
+        break;
+        
+      case 'login_attempting':
+        setStartupStatus('logging_in', 'Attempting to log in...');
+        break;
+        
+      case 'running':
+        setStartupStatus('logged_in', 'Successfully logged in! Bot is now running...');
+        break;
+        
+      case 'cycle_complete':
+        if (update.data.stats) {
+          setBotStatus({
+            is_running: true,
+            session_id: get().currentSession?.id || null,
+            session_name: get().currentSession?.session_name || null,
+            start_time: get().currentSession?.start_time || null,
+            status: 'running',
+            login_status: 'success',
+            total_checks: update.data.stats.total_checks || 0,
+            total_accepted: update.data.stats.total_accepted || 0,
+            total_rejected: update.data.stats.total_rejected || 0
+          });
+        }
+        break;
+        
+      case 'database_update':
+        if (update.data.session_id) {
+          setBotStatus({
+            is_running: true,
+            session_id: update.data.session_id,
+            session_name: get().currentSession?.session_name || null,
+            start_time: get().currentSession?.start_time || null,
+            status: update.data.status || 'running',
+            login_status: update.data.login_status || 'success',
+            total_checks: update.data.total_checks || 0,
+            total_accepted: update.data.total_accepted || 0,
+            total_rejected: update.data.total_rejected || 0
+          });
+        }
+        break;
+        
+      case 'bot_stopping':
+        setStartupStatus('stopping', 'Bot is being stopped...');
+        break;
+        
+      case 'bot_stopped':
+        setStartupStatus('stopped', 'Bot has been stopped successfully');
+        // Clear the bot status when stopped
+        setBotStatus({
+          is_running: false,
+          session_id: null,
+          session_name: null,
+          start_time: null,
+          status: 'stopped',
+          login_status: 'not_started',
+          total_checks: 0,
+          total_accepted: 0,
+          total_rejected: 0
+        });
+        break;
+        
+      case 'stopped':
+        setStartupStatus('stopped', 'Bot has been stopped');
+        break;
+        
+      case 'error':
+        setStartupStatus('error', update.data.error || 'An error occurred');
+        break;
+        
       case 'status_update':
         if (update.data.bot_status) {
           setBotStatus(update.data.bot_status);
@@ -202,6 +370,31 @@ export const useBotStore = create<BotStore>((set, get) => ({
             total_rejected: update.data.counts.total_rejected || botStatus.total_rejected,
           });
         }
+        // Log individual job decisions
+        if (update.type === 'job_accepted') {
+          console.log(`✅ Job Accepted: ${update.data.language} - ${update.data.message}`);
+        } else {
+          console.log(`❌ Job Rejected: ${update.data.language} - ${update.data.reason}`);
+        }
+        break;
+        
+      case 'checking_jobs':
+        setStartupStatus('checking_jobs', update.data.message);
+        console.log(`🔍 ${update.data.message}`);
+        break;
+        
+      case 'job_processing_complete':
+        if (update.data.total_checks !== undefined && botStatus) {
+          setBotStatus({
+            ...botStatus,
+            total_checks: update.data.total_checks,
+            total_accepted: update.data.total_accepted || 0,
+            total_rejected: update.data.total_rejected || 0,
+            is_running: botStatus.is_running,
+            status: botStatus.status || 'running', // Ensure status is properly typed
+          });
+        }
+        console.log(`📊 Job Processing Complete: ${update.data.message}`);
         break;
         
       default:

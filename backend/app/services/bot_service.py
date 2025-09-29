@@ -5,7 +5,7 @@ import os
 import signal
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import psutil
@@ -20,14 +20,19 @@ class BotService:
     """Service for managing bot operations"""
     
     def __init__(self):
-        self.redis_client = get_redis()
+        try:
+            self.redis_client = get_redis()
+        except Exception as e:
+            print(f"Redis not available, running without Redis: {e}")
+            self.redis_client = None
         self.bot_process = None
     
     def start_bot(self, session_id: str, config: Dict[str, Any]) -> bool:
         """Start the bot process"""
         try:
-            # Set bot configuration in Redis
-            self.redis_client.hset(f"bot_config:{session_id}", mapping=config)
+            # Set bot configuration in Redis (if available)
+            if self.redis_client:
+                self.redis_client.hset(f"bot_config:{session_id}", mapping=config)
             
             # Start bot process
             bot_script_path = os.path.join(
@@ -42,15 +47,16 @@ class BotService:
                 preexec_fn=os.setsid if os.name != 'nt' else None
             )
             
-            # Store process info in Redis
-            self.redis_client.hset(
-                f"bot_process:{session_id}",
-                mapping={
-                    "pid": str(self.bot_process.pid),
-                    "start_time": datetime.utcnow().isoformat(),
-                    "status": "running"
-                }
-            )
+            # Store process info in Redis (if available)
+            if self.redis_client:
+                self.redis_client.hset(
+                    f"bot_process:{session_id}",
+                    mapping={
+                        "pid": str(self.bot_process.pid),
+                        "start_time": datetime.now(timezone.utc).isoformat(),
+                        "status": "running"
+                    }
+                )
             
             return True
             
@@ -61,21 +67,22 @@ class BotService:
     def stop_bot(self, session_id: str) -> bool:
         """Stop the bot process"""
         try:
-            # Get process info from Redis
-            process_info = self.redis_client.hgetall(f"bot_process:{session_id}")
-            
-            if process_info and "pid" in process_info:
-                pid = int(process_info["pid"])
+            # Get process info from Redis (if available)
+            if self.redis_client:
+                process_info = self.redis_client.hgetall(f"bot_process:{session_id}")
                 
-                # Terminate process
-                if os.name == 'nt':  # Windows
-                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)])
-                else:  # Unix-like
-                    os.killpg(os.getpgid(pid), signal.SIGTERM)
-            
-            # Clean up Redis data
-            self.redis_client.delete(f"bot_process:{session_id}")
-            self.redis_client.delete(f"bot_config:{session_id}")
+                if process_info and "pid" in process_info:
+                    pid = int(process_info["pid"])
+                    
+                    # Terminate process
+                    if os.name == 'nt':  # Windows
+                        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)])
+                    else:  # Unix-like
+                        os.killpg(os.getpgid(pid), signal.SIGTERM)
+                
+                # Clean up Redis data
+                self.redis_client.delete(f"bot_process:{session_id}")
+                self.redis_client.delete(f"bot_config:{session_id}")
             
             return True
             
@@ -85,6 +92,9 @@ class BotService:
     
     def is_bot_running(self, session_id: str) -> bool:
         """Check if bot is running"""
+        if not self.redis_client:
+            return False
+            
         process_info = self.redis_client.hgetall(f"bot_process:{session_id}")
         
         if not process_info or "pid" not in process_info:
@@ -98,6 +108,9 @@ class BotService:
     
     def get_bot_metrics(self, session_id: str) -> Dict[str, Any]:
         """Get current bot metrics from Redis"""
+        if not self.redis_client:
+            return {}
+            
         metrics = self.redis_client.hgetall(f"bot_metrics:{session_id}")
         
         # Convert string values to appropriate types
@@ -114,7 +127,8 @@ class BotService:
     
     def update_bot_metrics(self, session_id: str, metrics: Dict[str, Any]):
         """Update bot metrics in Redis"""
-        self.redis_client.hset(f"bot_metrics:{session_id}", mapping=metrics)
+        if self.redis_client:
+            self.redis_client.hset(f"bot_metrics:{session_id}", mapping=metrics)
     
     def log_bot_activity(self, session_id: str, level: str, message: str, component: str = "bot"):
         """Log bot activity to Redis and database"""
@@ -123,15 +137,19 @@ class BotService:
             "level": level,
             "message": message,
             "component": component,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
-        # Store in Redis for real-time access
-        self.redis_client.lpush(f"bot_logs:{session_id}", str(log_entry))
-        self.redis_client.ltrim(f"bot_logs:{session_id}", 0, 999)  # Keep last 1000 logs
+        # Store in Redis for real-time access (if available)
+        if self.redis_client:
+            self.redis_client.lpush(f"bot_logs:{session_id}", str(log_entry))
+            self.redis_client.ltrim(f"bot_logs:{session_id}", 0, 999)  # Keep last 1000 logs
     
     def get_recent_logs(self, session_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Get recent bot logs"""
+        if not self.redis_client:
+            return []
+            
         logs = self.redis_client.lrange(f"bot_logs:{session_id}", 0, limit - 1)
         return [eval(log) for log in logs]  # Convert string back to dict
     
@@ -186,7 +204,7 @@ class BotService:
     
     def cleanup_old_data(self, db: Session, days: int = 7):
         """Clean up old data based on retention policy"""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Delete old analytics periods
         db.query(AnalyticsPeriod).filter(
@@ -210,14 +228,14 @@ class BotService:
             BotSession.start_time < cutoff_date
         ).update({
             "status": "stopped",
-            "end_time": datetime.utcnow()
+            "end_time": datetime.now(timezone.utc)
         })
         
         db.commit()
     
     def get_dashboard_metrics(self, db: Session) -> Dict[str, Any]:
         """Get dashboard metrics for the frontend"""
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         today_start = datetime.combine(today, datetime.min.time())
         
         # Active sessions
@@ -248,7 +266,12 @@ class BotService:
         
         bot_uptime_hours = 0
         if active_session:
-            uptime = datetime.utcnow() - active_session.start_time
+            now = datetime.now(timezone.utc)
+            start_time = active_session.start_time
+            # Ensure both datetimes are timezone-aware
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=timezone.utc)
+            uptime = now - start_time
             bot_uptime_hours = uptime.total_seconds() / 3600
         
         # Last activity

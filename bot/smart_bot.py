@@ -30,10 +30,40 @@ def send_status_update(status: str, data: Dict[str, Any] = None) -> None:
                 "status": status,
                 "data": data or {}
             }
-            # This would normally send to a WebSocket or API endpoint
-            log(f"Status update: {status} - {data}")
+            
+            # Send to backend API
+            response = requests.post(
+                f"{API_BASE_URL}/api/bot/realtime-update",
+                json={
+                    "type": status,
+                    "data": data or {},
+                    "timestamp": datetime.now().isoformat()
+                },
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                log(f"Status update sent: {status} - {data}")
+            else:
+                log(f"Failed to send status update: HTTP {response.status_code}")
     except Exception as e:
         log(f"Failed to send status update: {e}")
+
+def update_database(session_id: str, status: str, total_checks: int, total_accepted: int, total_rejected: int, login_status: str):
+    """Update database with current bot status"""
+    try:
+        # This would normally update the database directly
+        # For now, we'll send it as a status update
+        send_status_update("database_update", {
+            "session_id": session_id,
+            "status": status,
+            "total_checks": total_checks,
+            "total_accepted": total_accepted,
+            "total_rejected": total_rejected,
+            "login_status": login_status
+        })
+    except Exception as e:
+        log(f"Failed to update database: {e}")
 
 def simulate_login_process():
     """Simulate the login process with detailed steps"""
@@ -139,11 +169,18 @@ def simulate_bot_workflow():
     log("🚀 Starting Smart AtoZ Bot...")
     send_status_update("starting", {"message": "Bot initialization complete"})
     
+    # Update database with starting status
+    update_database(SESSION_ID, "starting", 0, 0, 0, "attempting")
+    
     # Step 1: Login Process
     if not simulate_login_process():
         log("❌ Login failed, stopping bot")
         send_status_update("login_failed", {"error": "Authentication failed"})
+        update_database(SESSION_ID, "error", 0, 0, 0, "failed")
         return
+    
+    # Update database with successful login
+    update_database(SESSION_ID, "running", 0, 0, 0, "success")
     
     # Step 2: Job Checking Cycles
     log("🔄 Starting job checking cycles...")
@@ -168,6 +205,16 @@ def simulate_bot_workflow():
             total_stats["total_rejected"] += cycle_stats["rejected"]
             total_stats["total_skipped"] += cycle_stats["skipped"]
             
+            # Update database with current metrics
+            update_database(
+                SESSION_ID, 
+                "running", 
+                total_stats["total_checks"], 
+                total_stats["total_accepted"], 
+                total_stats["total_rejected"], 
+                "success"
+            )
+            
             # Send summary update
             send_status_update("cycle_complete", {
                 "cycle": cycle_count,
@@ -182,10 +229,12 @@ def simulate_bot_workflow():
         except KeyboardInterrupt:
             log("🛑 Bot stopped by user")
             send_status_update("stopped", {"reason": "User interruption"})
+            update_database(SESSION_ID, "stopped", total_stats["total_checks"], total_stats["total_accepted"], total_stats["total_rejected"], "success")
             break
         except Exception as e:
             log(f"❌ Bot error: {e}")
             send_status_update("error", {"error": str(e)})
+            update_database(SESSION_ID, "error", total_stats["total_checks"], total_stats["total_accepted"], total_stats["total_rejected"], "success")
             time.sleep(5)  # Wait before retrying
 
 if __name__ == "__main__":

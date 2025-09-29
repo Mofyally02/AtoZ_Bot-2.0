@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 3000000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -41,13 +41,13 @@ apiClient.interceptors.response.use(
 
 export const apiService = {
   // Bot Control
-  async startBot(data: { session_name?: string }): Promise<BotSession> {
-    const response = await apiClient.post('/api/bot/start', data);
+  async startBot(): Promise<{ status: string; running: boolean }> {
+    const response = await apiClient.post('/api/bot/toggle');
     return response.data;
   },
 
-  async stopBot(): Promise<{ message: string; status: string }> {
-    const response = await apiClient.post('/api/bot/stop');
+  async stopBot(): Promise<{ status: string; running: boolean }> {
+    const response = await apiClient.post('/api/bot/toggle');
     return response.data;
   },
 

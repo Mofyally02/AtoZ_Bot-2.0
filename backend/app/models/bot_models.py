@@ -3,9 +3,10 @@ Database models for AtoZ Bot Dashboard
 """
 import uuid
 
-from sqlalchemy import (ARRAY, DECIMAL, UUID, Boolean, Column, DateTime,
-                        ForeignKey, Integer, String, Text)
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy import (Boolean, Column, DateTime, Float, ForeignKey, 
+                        Integer, String, Text, JSON)
+from sqlalchemy.dialects.postgresql import UUID
+# PostgreSQL uses native JSON type
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -15,7 +16,7 @@ from app.database.connection import Base
 class BotSession(Base):
     __tablename__ = "bot_sessions"
     
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_name = Column(String(255), nullable=False)
     start_time = Column(DateTime(timezone=True), server_default=func.now())
     end_time = Column(DateTime(timezone=True), nullable=True)
@@ -35,8 +36,8 @@ class BotSession(Base):
 class JobRecord(Base):
     __tablename__ = "job_records"
     
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    session_id = Column(PostgresUUID(as_uuid=True), ForeignKey("bot_sessions.id", ondelete="CASCADE"))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("bot_sessions.id", ondelete="CASCADE"))
     job_ref = Column(String(100), nullable=False)
     language = Column(String(100), nullable=False)
     appointment_date = Column(DateTime, nullable=False)
@@ -56,13 +57,13 @@ class JobRecord(Base):
 class AnalyticsPeriod(Base):
     __tablename__ = "analytics_periods"
     
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     period_start = Column(DateTime(timezone=True), nullable=False)
     period_end = Column(DateTime(timezone=True), nullable=False)
     total_jobs_processed = Column(Integer, default=0)
     jobs_accepted = Column(Integer, default=0)
     jobs_rejected = Column(Integer, default=0)
-    acceptance_rate = Column(DECIMAL(5, 2), default=0.00)
+    acceptance_rate = Column(Float, default=0.00)
     most_common_language = Column(String(100), nullable=True)
     peak_hour = Column(Integer, nullable=True)
     bot_uptime_seconds = Column(Integer, default=0)
@@ -72,9 +73,9 @@ class AnalyticsPeriod(Base):
 class BotConfiguration(Base):
     __tablename__ = "bot_configurations"
     
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     config_name = Column(String(255), nullable=False, unique=True)
-    check_interval_seconds = Column(DECIMAL(5, 2), default=0.5)
+    check_interval_seconds = Column(Float, default=0.5)
     results_report_interval_seconds = Column(Integer, default=5)
     rejected_report_interval_seconds = Column(Integer, default=43200)
     quick_check_interval_seconds = Column(Integer, default=10)
@@ -83,7 +84,7 @@ class BotConfiguration(Base):
     enable_rejected_reporting = Column(Boolean, default=True)
     max_accept_per_run = Column(Integer, default=5)
     job_type_filter = Column(String(100), default="Telephone interpreting")
-    exclude_types = Column(ARRAY(String), nullable=True)
+    exclude_types = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -92,8 +93,8 @@ class BotConfiguration(Base):
 class SystemLog(Base):
     __tablename__ = "system_logs"
     
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    session_id = Column(PostgresUUID(as_uuid=True), ForeignKey("bot_sessions.id", ondelete="CASCADE"))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("bot_sessions.id", ondelete="CASCADE"))
     log_level = Column(String(20), nullable=False)  # INFO, WARNING, ERROR, DEBUG
     message = Column(Text, nullable=False)
     component = Column(String(100), nullable=True)

@@ -46,9 +46,9 @@ export interface AnalyticsData {
 
 export interface BotStatus {
   is_running: boolean;
-  session_id?: string;
-  session_name?: string;
-  start_time?: string;
+  session_id?: string | null;
+  session_name?: string | null;
+  start_time?: string | null;
   status: 'running' | 'stopped' | 'error' | 'starting';
   login_status: string;
   total_checks: number;
@@ -99,7 +99,7 @@ export interface WebSocketMessage {
 }
 
 export interface RealtimeUpdate {
-  type: 'job_accepted' | 'job_rejected' | 'status_change' | 'status_update' | 'metric_update' | 'analytics_update';
+  type: 'job_accepted' | 'job_rejected' | 'status_change' | 'status_update' | 'metric_update' | 'analytics_update' | 'connection_check' | 'bot_starting' | 'bot_started' | 'bot_error' | 'login_attempt' | 'login_success' | 'login_failed' | 'starting' | 'login_attempting' | 'login_failed' | 'running' | 'cycle_complete' | 'database_update' | 'stopped' | 'error' | 'bot_stopping' | 'bot_stopped' | 'checking_jobs' | 'job_processing_complete';
   data: Record<string, any>;
   timestamp: string;
 }

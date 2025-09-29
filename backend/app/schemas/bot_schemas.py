@@ -1,7 +1,7 @@
 """
 Pydantic schemas for API requests and responses
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -79,6 +79,7 @@ class BotStatusResponse(BaseModel):
     session_id: Optional[str] = None
     session_name: Optional[str] = None
     start_time: Optional[datetime] = None
+    status: str
     login_status: str
     total_checks: int
     total_accepted: int
@@ -133,4 +134,4 @@ class RealtimeUpdate(BaseModel):
 class WebSocketMessage(BaseModel):
     type: str
     data: Dict[str, Any]
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
