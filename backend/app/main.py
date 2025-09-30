@@ -20,14 +20,30 @@ from app.api.bot_control import router as bot_router
 from app.database.connection import Base, engine
 from app.services.bot_service import BotService
 
-# Create database tables with error handling
-try:
-    Base.metadata.create_all(bind=engine)
-    print("✅ PostgreSQL database tables created successfully")
-except Exception as e:
-    print(f"❌ Error creating database tables: {e}")
-    print("Make sure PostgreSQL is running and accessible")
-    raise e
+# Create database tables with retry logic
+def create_database_tables():
+    """Create database tables with retry logic"""
+    max_retries = 5
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("✅ PostgreSQL database tables created successfully")
+            return True
+        except Exception as e:
+            print(f"❌ Database table creation attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"⏳ Waiting {retry_delay} seconds before retry...")
+                import time
+                time.sleep(retry_delay)
+            else:
+                print("❌ All database table creation attempts failed")
+                print("Make sure PostgreSQL is running and accessible")
+                raise e
+
+# Create database tables
+create_database_tables()
 
 # Custom JSON encoder to handle UUIDs and datetimes
 class CustomJSONEncoder(json.JSONEncoder):
@@ -200,12 +216,38 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
+    """Health check endpoint with detailed status"""
+    health_status = {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "version": "1.0.0"
+        "service": "AtoZ Bot Dashboard API",
+        "version": "2.0.0",
+        "checks": {}
     }
+    
+    # Check database connection
+    try:
+        from app.database.connection import engine
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        health_status["checks"]["database"] = "healthy"
+    except Exception as e:
+        health_status["checks"]["database"] = f"unhealthy: {str(e)}"
+        health_status["status"] = "unhealthy"
+    
+    # Check Redis connection
+    try:
+        from app.database.connection import get_redis
+        redis_client = get_redis()
+        if redis_client:
+            redis_client.ping()
+            health_status["checks"]["redis"] = "healthy"
+        else:
+            health_status["checks"]["redis"] = "not_configured"
+    except Exception as e:
+        health_status["checks"]["redis"] = f"unhealthy: {str(e)}"
+    
+    return health_status
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

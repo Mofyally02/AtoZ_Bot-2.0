@@ -41,4 +41,12 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
 # Change to backend directory and start
 WORKDIR /app/backend
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Create startup script with delay
+RUN echo '#!/bin/bash\n\
+echo "⏳ Waiting for database to be ready..."\n\
+sleep 10\n\
+echo "🚀 Starting AtoZ Bot backend..."\n\
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]

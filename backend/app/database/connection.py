@@ -37,9 +37,10 @@ engine = create_engine(
 # Test PostgreSQL connection with retry logic
 def test_postgres_connection():
     """Test PostgreSQL connection with retry logic"""
-    max_retries = 5
-    retry_delay = 2
+    max_retries = 10
+    retry_delay = 3
     
+    print("🔍 Testing PostgreSQL connection...")
     for attempt in range(max_retries):
         try:
             with engine.connect() as conn:
@@ -49,16 +50,23 @@ def test_postgres_connection():
         except Exception as e:
             print(f"PostgreSQL connection attempt {attempt + 1}/{max_retries} failed: {e}")
             if attempt < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds...")
+                print(f"⏳ Retrying in {retry_delay} seconds...")
                 import time
                 time.sleep(retry_delay)
             else:
                 print("❌ PostgreSQL connection failed - all retries exhausted")
+                print("This might cause the application to fail to start")
                 return False
 
-# Test connection on startup
+# Test connection on startup (non-blocking)
 if "postgresql" in DATABASE_URL:
-    test_postgres_connection()
+    import threading
+    def test_connection_async():
+        test_postgres_connection()
+    
+    # Start connection test in background
+    connection_thread = threading.Thread(target=test_connection_async, daemon=True)
+    connection_thread.start()
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
