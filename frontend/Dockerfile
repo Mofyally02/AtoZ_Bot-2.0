@@ -1,48 +1,34 @@
-# Combined Frontend + Backend Dockerfile for Coolify
-FROM python:3.11-slim
+# Frontend-only Dockerfile for Coolify
+FROM node:18-alpine
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Copy package files
+COPY package*.json ./
 
-# Install Node.js for frontend build
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
-
-# Copy requirements first for better caching
-COPY backend/requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy frontend package files and build frontend
-COPY frontend/package*.json ./frontend/
-WORKDIR /app/frontend
+# Install dependencies
 RUN npm install
-COPY frontend/ ./
+
+# Copy source code
+COPY . .
+
+# Build the application
 RUN npm run build
 
-# Go back to app directory
-WORKDIR /app
-
-# Copy application code
-COPY backend/ ./backend/
-COPY bot/ ./bot/
-COPY database/ ./database/
-
-# Set Python path
-ENV PYTHONPATH=/app/backend
+# Install serve for production
+RUN npm install -g serve
 
 # Create non-root user
-RUN useradd -m -u 1000 atoz && chown -R atoz:atoz /app
-USER atoz
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Change ownership
+RUN chown -R nextjs:nodejs /app
+USER nextjs
 
 # Expose port
 EXPOSE 8000
@@ -51,6 +37,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Change to backend directory and start
-WORKDIR /app/backend
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start command
+CMD ["serve", "-s", "dist", "-l", "8000"]
