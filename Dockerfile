@@ -11,11 +11,25 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js for frontend build
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
 # Copy requirements first for better caching
 COPY backend/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy frontend package files and build frontend
+COPY frontend/package*.json ./frontend/
+WORKDIR /app/frontend
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+# Go back to app directory
+WORKDIR /app
 
 # Copy application code
 COPY backend/ ./backend/
