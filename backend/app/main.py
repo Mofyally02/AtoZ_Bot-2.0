@@ -171,8 +171,8 @@ app.add_middleware(
         "http://localhost:5173", 
         "http://localhost:5174", 
         "http://localhost:5175",
-        "https://your-domain.com",  # Add your production domain
-        "https://*.your-domain.com"  # Add wildcard for subdomains
+        "http://localhost:8000",  # Backend self-reference
+        "*"  # Allow all origins for now (restrict in production)
     ],
     allow_credentials=True,
     allow_methods=["*"],
