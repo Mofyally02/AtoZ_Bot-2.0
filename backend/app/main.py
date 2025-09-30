@@ -120,7 +120,7 @@ async def periodic_analytics():
         await asyncio.sleep(4 * 3600)  # Wait 4 hours
         
         # Create analytics period
-        from backend.app.database.connection import SessionLocal
+        from app.database.connection import SessionLocal
         db = SessionLocal()
         
         try:
@@ -128,7 +128,7 @@ async def periodic_analytics():
             start_time = end_time.replace(hour=(end_time.hour // 4) * 4, minute=0, second=0, microsecond=0)
             
             # Check if period already exists
-            from backend.app.models.bot_models import AnalyticsPeriod
+            from app.models.bot_models import AnalyticsPeriod
             existing = db.query(AnalyticsPeriod).filter(
                 AnalyticsPeriod.period_start == start_time
             ).first()
@@ -157,7 +157,7 @@ async def periodic_cleanup():
     while True:
         await asyncio.sleep(24 * 3600)  # Wait 24 hours
         
-        from backend.app.database.connection import SessionLocal
+        from app.database.connection import SessionLocal
         db = SessionLocal()
         
         try:
@@ -278,12 +278,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
                 
                 # Get current bot status and metrics
-                from backend.app.database.connection import SessionLocal
+                from app.database.connection import SessionLocal
                 db = SessionLocal()
                 
                 try:
                     # Get bot status
-                    from backend.app.api.bot_control import get_bot_status
+                    from app.api.bot_control import get_bot_status
                     bot_status = await get_bot_status(db)
                     
                     # Get dashboard metrics

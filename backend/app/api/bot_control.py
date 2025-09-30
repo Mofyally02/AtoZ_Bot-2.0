@@ -6,6 +6,7 @@ import json
 import os
 import signal
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -17,10 +18,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from backend.app.database.connection import get_db
-from backend.app.models.bot_models import (BotConfiguration, BotSession,
+from app.database.connection import get_db
+from app.models.bot_models import (BotConfiguration, BotSession,
                                            JobRecord, SystemLog)
-from backend.app.schemas.bot_schemas import (AnalyticsResponse,
+from app.schemas.bot_schemas import (AnalyticsResponse,
                                              BotControlRequest,
                                              BotSessionCreate,
                                              BotSessionResponse,
@@ -28,7 +29,7 @@ from backend.app.schemas.bot_schemas import (AnalyticsResponse,
                                              JobRecordResponse,
                                              DashboardMetrics,
                                              BotConfigurationResponse)
-from backend.app.services.bot_service import BotService
+from app.services.bot_service import BotService
 
 router = APIRouter(prefix="/api/bot", tags=["bot-control"])
 
@@ -137,7 +138,7 @@ async def force_reset_bot():
     
     # Reset database sessions
     try:
-        from backend.app.database.connection import get_db
+        from app.database.connection import get_db
         db = next(get_db())
         if db:
             db.execute(text("""
@@ -245,7 +246,7 @@ async def realtime_update(update_data: dict):
             
             if session_id:
                 try:
-                    from backend.app.database.connection import get_db
+                    from app.database.connection import get_db
                     from sqlalchemy import text
                     
                     db = next(get_db())
@@ -300,7 +301,7 @@ async def toggle_bot():
             
             # Reset database sessions
             try:
-                from backend.app.database.connection import get_db
+                from app.database.connection import get_db
                 db = next(get_db())
                 if db:
                     db.execute(text("""
@@ -346,7 +347,7 @@ async def start_bot(
     session = None  # Initialize session variable
     try:
         # First, check all connections before starting bot
-        from backend.app.services.connection_monitor import connection_monitor
+        from app.services.connection_monitor import connection_monitor
         connection_status = await connection_monitor.check_all_services()
         
         # Check if critical services are healthy
