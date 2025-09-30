@@ -17,6 +17,34 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db"
 )
+
+# Debug network connectivity
+import socket
+def test_hostname_resolution(hostname):
+    """Test if hostname can be resolved"""
+    try:
+        socket.gethostbyname(hostname)
+        return True
+    except socket.gaierror:
+        return False
+
+# Test database hostname resolution
+if "database" in DATABASE_URL:
+    if test_hostname_resolution("database"):
+        print("✅ Database hostname 'database' resolves successfully")
+    else:
+        print("❌ Database hostname 'database' cannot be resolved")
+        print("🔄 This might cause connection issues")
+        # Try to get the actual database service IP
+        try:
+            import subprocess
+            result = subprocess.run(['getent', 'hosts', 'database'], capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"Database IP: {result.stdout.strip()}")
+            else:
+                print("Could not resolve database hostname")
+        except Exception as e:
+            print(f"Error checking database hostname: {e}")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 # Debug logging
