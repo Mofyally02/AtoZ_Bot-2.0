@@ -16,9 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.bot_control import router as bot_router
-from app.database.connection import Base, engine
-from app.services.bot_service import BotService
+from backend.app.api.bot_control import router as bot_router
+from backend.app.database.connection import Base, engine
+from backend.app.services.bot_service import BotService
 
 # Create database tables with retry logic
 def create_database_tables():
@@ -107,7 +107,7 @@ async def periodic_analytics():
         await asyncio.sleep(4 * 3600)  # Wait 4 hours
         
         # Create analytics period
-        from app.database.connection import SessionLocal
+        from backend.app.database.connection import SessionLocal
         db = SessionLocal()
         
         try:
@@ -115,7 +115,7 @@ async def periodic_analytics():
             start_time = end_time.replace(hour=(end_time.hour // 4) * 4, minute=0, second=0, microsecond=0)
             
             # Check if period already exists
-            from app.models.bot_models import AnalyticsPeriod
+            from backend.app.models.bot_models import AnalyticsPeriod
             existing = db.query(AnalyticsPeriod).filter(
                 AnalyticsPeriod.period_start == start_time
             ).first()
@@ -144,7 +144,7 @@ async def periodic_cleanup():
     while True:
         await asyncio.sleep(24 * 3600)  # Wait 24 hours
         
-        from app.database.connection import SessionLocal
+        from backend.app.database.connection import SessionLocal
         db = SessionLocal()
         
         try:
@@ -227,7 +227,7 @@ async def health_check():
     
     # Check database connection
     try:
-        from app.database.connection import engine
+        from backend.app.database.connection import engine
         with engine.connect() as conn:
             conn.execute("SELECT 1")
         health_status["checks"]["database"] = "healthy"
@@ -237,7 +237,7 @@ async def health_check():
     
     # Check Redis connection
     try:
-        from app.database.connection import get_redis
+        from backend.app.database.connection import get_redis
         redis_client = get_redis()
         if redis_client:
             redis_client.ping()
@@ -265,12 +265,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
                 
                 # Get current bot status and metrics
-                from app.database.connection import SessionLocal
+                from backend.app.database.connection import SessionLocal
                 db = SessionLocal()
                 
                 try:
                     # Get bot status
-                    from app.api.bot_control import get_bot_status
+                    from backend.app.api.bot_control import get_bot_status
                     bot_status = await get_bot_status(db)
                     
                     # Get dashboard metrics

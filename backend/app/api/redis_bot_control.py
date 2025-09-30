@@ -10,11 +10,11 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.database.connection import get_db
-from app.models.bot_models import BotSession, SystemLog
-from app.schemas.bot_schemas import BotControlRequest, BotSessionResponse, BotStatusResponse
-from app.services.redis_bot_state import redis_bot_state, BotState, BotTaskType
-from app.services.connection_monitor import connection_monitor
+from backend.app.database.connection import get_db
+from backend.app.models.bot_models import BotSession, SystemLog
+from backend.app.schemas.bot_schemas import BotControlRequest, BotSessionResponse, BotStatusResponse
+from backend.app.services.redis_bot_state import redis_bot_state, BotState, BotTaskType
+from backend.app.services.connection_monitor import connection_monitor
 
 router = APIRouter(prefix="/api/bot", tags=["bot-redis"])
 

@@ -17,10 +17,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.database.connection import get_db
-from app.models.bot_models import (BotConfiguration, BotSession,
+from backend.app.database.connection import get_db
+from backend.app.models.bot_models import (BotConfiguration, BotSession,
                                            JobRecord, SystemLog)
-from app.schemas.bot_schemas import (AnalyticsResponse,
+from backend.app.schemas.bot_schemas import (AnalyticsResponse,
                                              BotControlRequest,
                                              BotSessionCreate,
                                              BotSessionResponse,
@@ -28,7 +28,7 @@ from app.schemas.bot_schemas import (AnalyticsResponse,
                                              JobRecordResponse,
                                              DashboardMetrics,
                                              BotConfigurationResponse)
-from app.services.bot_service import BotService
+from backend.app.services.bot_service import BotService
 
 router = APIRouter(prefix="/api/bot", tags=["bot-control"])
 
@@ -137,7 +137,7 @@ async def force_reset_bot():
     
     # Reset database sessions
     try:
-        from app.database.connection import get_db
+        from backend.app.database.connection import get_db
         db = next(get_db())
         if db:
             db.execute(text("""
@@ -245,7 +245,7 @@ async def realtime_update(update_data: dict):
             
             if session_id:
                 try:
-                    from app.database.connection import get_db
+                    from backend.app.database.connection import get_db
                     from sqlalchemy import text
                     
                     db = next(get_db())
@@ -300,7 +300,7 @@ async def toggle_bot():
             
             # Reset database sessions
             try:
-                from app.database.connection import get_db
+                from backend.app.database.connection import get_db
                 db = next(get_db())
                 if db:
                     db.execute(text("""
@@ -346,7 +346,7 @@ async def start_bot(
     session = None  # Initialize session variable
     try:
         # First, check all connections before starting bot
-        from app.services.connection_monitor import connection_monitor
+        from backend.app.services.connection_monitor import connection_monitor
         connection_status = await connection_monitor.check_all_services()
         
         # Check if critical services are healthy
@@ -388,24 +388,28 @@ async def start_bot(
         if not os.path.exists(bot_path):
             raise HTTPException(status_code=500, detail="Bot directory not found")
         
-        # Use the backend's Python environment
-        python_executable = os.path.join(os.path.dirname(__file__), "../../../venv/bin/python")
+        # Use the project's Python environment
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+        python_executable = os.path.join(project_root, "venv/bin/python")
         if not os.path.exists(python_executable):
             python_executable = "python"  # Fallback to system python
         
-        # Check if smart_bot.py exists (preferred for testing)
-        bot_script = os.path.join(bot_path, "smart_bot.py")
+        # Use atoz_bot.py directly (sync API, run as subprocess)
+        bot_script = os.path.join(bot_path, "atoz_bot.py")
         if not os.path.exists(bot_script):
             # Fallback to integrated_bot.py
             bot_script = os.path.join(bot_path, "integrated_bot.py")
             if not os.path.exists(bot_script):
-                # Fallback to realistic_test_bot.py
-                bot_script = os.path.join(bot_path, "realistic_test_bot.py")
+                # Fallback to real_atoz_bot.py
+                bot_script = os.path.join(bot_path, "real_atoz_bot.py")
                 if not os.path.exists(bot_script):
-                    # Fallback to test_bot.py
-                    bot_script = os.path.join(bot_path, "test_bot.py")
+                    # Fallback to smart_bot.py (simulated)
+                    bot_script = os.path.join(bot_path, "smart_bot.py")
                     if not os.path.exists(bot_script):
-                        raise HTTPException(status_code=500, detail="Bot script not found")
+                        # Fallback to test_bot.py
+                        bot_script = os.path.join(bot_path, "test_bot.py")
+                        if not os.path.exists(bot_script):
+                            raise HTTPException(status_code=500, detail="Bot script not found")
         
         # Send real-time update about bot process starting
         await send_realtime_update("bot_starting", {
@@ -415,13 +419,23 @@ async def start_bot(
         })
         
         try:
+            # Set up environment variables for the bot
+            bot_env = os.environ.copy()
+            bot_env.update({
+                'DATABASE_URL': 'postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db',
+                'REDIS_URL': 'redis://localhost:6379',
+                'ATOZ_BASE_URL': 'https://portal.atozinterpreting.com',
+                'ATOZ_USERNAME': 'hussain02747@gmail.com',
+                'ATOZ_PASSWORD': 'Ngoma2003#'
+            })
+            
             bot_process = subprocess.Popen(
                 [python_executable, os.path.basename(bot_script), str(session.id)],
                 cwd=bot_path,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 preexec_fn=os.setsid if os.name != 'nt' else None,
-                env=os.environ.copy()
+                env=bot_env
             )
         except Exception as e:
             await send_realtime_update("bot_error", {

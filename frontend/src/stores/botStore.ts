@@ -14,6 +14,7 @@ interface BotStore {
   isLoading: boolean;
   startupStatus: string | null;
   startupMessage: string | null;
+  statusPollingInterval: number | null;
   
   // Actions
   setBotStatus: (status: BotStatus) => void;
@@ -30,6 +31,8 @@ interface BotStore {
   connectWebSocket: () => Promise<void>;
   disconnectWebSocket: () => void;
   handleRealtimeUpdate: (update: RealtimeUpdate) => void;
+  startStatusPolling: () => void;
+  stopStatusPolling: () => void;
 }
 
 export const useBotStore = create<BotStore>((set, get) => ({
@@ -43,6 +46,7 @@ export const useBotStore = create<BotStore>((set, get) => ({
   isLoading: false,
   startupStatus: null,
   startupMessage: null,
+  statusPollingInterval: null,
   
   // Actions
   setBotStatus: (status) => set({ botStatus: status }),
@@ -75,19 +79,35 @@ export const useBotStore = create<BotStore>((set, get) => ({
     try {
       setLoading(true);
       setError(null);
-      setStartupStatus('checking_connections', 'Checking all connections...');
+      setStartupStatus('starting_bot', 'Starting bot...');
       
       const response = await apiService.startBot();
       
-      if (response.running) {
+      if (response.success && response.status === 'running') {
         setStartupStatus('bot_running', 'Bot started successfully');
-        // Refresh status to get updated bot information
+        
+        // Create session object from response
+        const session = {
+          id: response.session_id || 'unknown',
+          session_name: response.session_name || 'Bot Session',
+          start_time: response.start_time || new Date().toISOString(),
+          status: 'running' as const,
+          login_status: 'success' as const,
+          total_checks: 0,
+          total_accepted: 0,
+          total_rejected: 0,
+          created_at: new Date().toISOString()
+        };
+        
+        set({ currentSession: session });
         await refreshStatus();
-        // Connect to WebSocket for real-time updates
-        await get().connectWebSocket();
+        
+        // Start status polling for real-time updates
+        get().startStatusPolling();
+        
       } else {
-        setError('Failed to start bot');
-        setStartupStatus('error', 'Failed to start bot');
+        setError(response.message || 'Failed to start bot');
+        setStartupStatus('error', response.message || 'Failed to start bot');
       }
       
     } catch (error: any) {
@@ -109,14 +129,16 @@ export const useBotStore = create<BotStore>((set, get) => ({
       
       const response = await apiService.stopBot();
       
-      if (!response.running) {
+      if (response.success && response.status === 'stopped') {
         set({ currentSession: null });
-        // Disconnect WebSocket
         disconnectWebSocket();
-        // Refresh status to get updated bot information
+        
+        // Stop status polling
+        get().stopStatusPolling();
+        
         await refreshStatus();
       } else {
-        setError('Failed to stop bot');
+        setError(response.message || 'Failed to stop bot');
       }
       
     } catch (error: any) {
@@ -132,7 +154,7 @@ export const useBotStore = create<BotStore>((set, get) => ({
     const { setError, setConnected } = get();
     
     try {
-      const status = await apiService.getBotStatus();
+      const status = await apiService.getLiveBotStatus();
       set({ botStatus: status });
       setConnected(true);
       setError(null); // Clear any previous errors
@@ -399,6 +421,35 @@ export const useBotStore = create<BotStore>((set, get) => ({
         
       default:
         console.log('Unhandled real-time update:', update);
+    }
+  },
+
+  startStatusPolling: () => {
+    const { stopStatusPolling, refreshStatus } = get();
+    
+    // Stop any existing polling
+    stopStatusPolling();
+    
+    // Start new polling every 5 minutes
+    const interval = setInterval(async () => {
+      try {
+        await refreshStatus();
+      } catch (error) {
+        console.error('Error polling status:', error);
+      }
+    }, 300000); // 5 minutes = 300,000 milliseconds
+    
+    set({ statusPollingInterval: interval });
+    console.log('🔄 Started status polling (every 5 minutes)');
+  },
+
+  stopStatusPolling: () => {
+    const { statusPollingInterval } = get();
+    
+    if (statusPollingInterval) {
+      clearInterval(statusPollingInterval);
+      set({ statusPollingInterval: null });
+      console.log('⏹️ Stopped status polling');
     }
   },
 }));

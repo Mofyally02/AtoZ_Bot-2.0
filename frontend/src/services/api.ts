@@ -40,19 +40,26 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
-  // Bot Control
-  async startBot(): Promise<{ status: string; running: boolean }> {
-    const response = await apiClient.post('/api/bot/toggle');
+  // Bot Control - Simple API
+  async startBot(sessionName?: string): Promise<{ success: boolean; message: string; status: string; session_id?: string; session_name?: string; start_time?: string }> {
+    const response = await apiClient.post('/api/bot/start', {
+      session_name: sessionName || `Session_${new Date().toISOString()}`
+    });
     return response.data;
   },
 
-  async stopBot(): Promise<{ status: string; running: boolean }> {
-    const response = await apiClient.post('/api/bot/toggle');
+  async stopBot(): Promise<{ success: boolean; message: string; status: string }> {
+    const response = await apiClient.post('/api/bot/stop');
     return response.data;
   },
 
   async getBotStatus(): Promise<BotStatus> {
     const response = await apiClient.get('/api/bot/status');
+    return response.data;
+  },
+
+  async getLiveBotStatus(): Promise<BotStatus> {
+    const response = await apiClient.get('/api/bot/live-status');
     return response.data;
   },
 

@@ -44,7 +44,8 @@ def test_postgres_connection():
     for attempt in range(max_retries):
         try:
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                from sqlalchemy import text
+                conn.execute(text("SELECT 1"))
             print("✅ PostgreSQL connection successful")
             return True
         except Exception as e:

@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
-from app.database.connection import get_redis
-from app.models.bot_models import BotSession
+from backend.app.database.connection import get_redis
+from backend.app.models.bot_models import BotSession
 
 class BotState(Enum):
     STARTING = "starting"
