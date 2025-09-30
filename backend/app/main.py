@@ -16,9 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.app.api.bot_control import router as bot_router
-from backend.app.database.connection import Base, engine
-from backend.app.services.bot_service import BotService
+from app.api.bot_control import router as bot_router
+from app.database.connection import Base, engine
+from app.services.bot_service import BotService
 
 # Create database tables with retry logic
 def create_database_tables():
@@ -240,7 +240,7 @@ async def health_check():
     
     # Check database connection
     try:
-        from backend.app.database.connection import engine
+        from app.database.connection import engine
         with engine.connect() as conn:
             conn.execute("SELECT 1")
         health_status["checks"]["database"] = "healthy"
@@ -250,7 +250,7 @@ async def health_check():
     
     # Check Redis connection
     try:
-        from backend.app.database.connection import get_redis
+        from app.database.connection import get_redis
         redis_client = get_redis()
         if redis_client:
             redis_client.ping()
