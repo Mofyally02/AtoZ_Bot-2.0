@@ -17,7 +17,7 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "sqlite:///./atoz_bot.db"
 )
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
 # Create SQLAlchemy engine
 engine = create_engine(

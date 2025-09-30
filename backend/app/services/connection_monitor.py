@@ -3,6 +3,7 @@ Connection monitoring and health check service
 """
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from enum import Enum
@@ -126,7 +127,9 @@ class ConnectionMonitor:
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get('http://localhost:8000/health', timeout=2) as response:
+                # Use environment variable or default to localhost for development
+                health_url = os.getenv('HEALTH_CHECK_URL', 'http://localhost:8000/health')
+                async with session.get(health_url, timeout=2) as response:
                     if response.status == 200:
                         return ConnectionStatus.HEALTHY
                     else:
