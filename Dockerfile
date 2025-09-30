@@ -23,7 +23,7 @@ COPY bot/ ./bot/
 COPY database/ ./database/
 
 # Set Python path
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/backend
 
 # Create non-root user
 RUN useradd -m -u 1000 atoz && chown -R atoz:atoz /app
@@ -37,4 +37,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Start command
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--chdir", "/app/backend"]
