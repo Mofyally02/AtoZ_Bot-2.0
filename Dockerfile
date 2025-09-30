@@ -12,15 +12,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY app/backend/requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY app/backend/ ./backend/
-COPY app/bot/ ./bot/
-COPY app/database/ ./database/
+COPY backend/ ./backend/
+COPY bot/ ./bot/
+COPY database/ ./database/
 
 # Set Python path
 ENV PYTHONPATH=/app
@@ -37,4 +37,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Start command
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

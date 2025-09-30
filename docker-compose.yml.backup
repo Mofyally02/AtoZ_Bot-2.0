@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: atoz-bot-app
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./backend/atoz_bot.db}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - PYTHONPATH=/app
       - ENVIRONMENT=production
@@ -30,7 +30,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
   # PostgreSQL Database
   database:
