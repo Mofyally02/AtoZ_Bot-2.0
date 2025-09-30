@@ -23,9 +23,10 @@ from app.services.bot_service import BotService
 # Create database tables with retry logic
 def create_database_tables():
     """Create database tables with retry logic"""
-    max_retries = 5
-    retry_delay = 2
+    max_retries = 10
+    retry_delay = 5
     
+    print("🔍 Attempting to create database tables...")
     for attempt in range(max_retries):
         try:
             Base.metadata.create_all(bind=engine)
@@ -33,17 +34,29 @@ def create_database_tables():
             return True
         except Exception as e:
             print(f"❌ Database table creation attempt {attempt + 1}/{max_retries} failed: {e}")
+            if "could not translate host name" in str(e):
+                print("🔍 Hostname resolution issue detected")
+                print("💡 This usually means the database service isn't ready yet")
+            elif "connection refused" in str(e):
+                print("🔍 Connection refused - database service might not be running")
+            elif "timeout" in str(e).lower():
+                print("🔍 Connection timeout - database service might be slow to start")
+            
             if attempt < max_retries - 1:
                 print(f"⏳ Waiting {retry_delay} seconds before retry...")
                 import time
                 time.sleep(retry_delay)
             else:
                 print("❌ All database table creation attempts failed")
-                print("Make sure PostgreSQL is running and accessible")
-                raise e
+                print("⚠️  Continuing without database tables - they will be created on first connection")
+                return False
 
-# Create database tables
-create_database_tables()
+# Create database tables (non-blocking)
+try:
+    create_database_tables()
+except Exception as e:
+    print(f"⚠️  Database initialization failed: {e}")
+    print("🔄 Application will continue and retry on first database access")
 
 # Custom JSON encoder to handle UUIDs and datetimes
 class CustomJSONEncoder(json.JSONEncoder):
