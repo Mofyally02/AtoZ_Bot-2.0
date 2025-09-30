@@ -22,6 +22,8 @@ COPY backend/ ./backend/
 COPY bot/ ./bot/
 COPY database/ ./database/
 
+# PostgreSQL is handled by docker-compose service
+
 # Set Python path
 ENV PYTHONPATH=/app/backend
 
@@ -38,4 +40,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
 
 # Change to backend directory and start
 WORKDIR /app/backend
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

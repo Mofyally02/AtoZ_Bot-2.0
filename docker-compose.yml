@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: atoz-bot-app
     environment:
-      - DATABASE_URL=${DATABASE_URL:-sqlite:///./backend/atoz_bot.db}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - PYTHONPATH=/app/backend
       - ENVIRONMENT=production

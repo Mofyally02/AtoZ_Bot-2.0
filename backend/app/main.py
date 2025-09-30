@@ -20,8 +20,14 @@ from app.api.bot_control import router as bot_router
 from app.database.connection import Base, engine
 from app.services.bot_service import BotService
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables with error handling
+try:
+    Base.metadata.create_all(bind=engine)
+    print("✅ PostgreSQL database tables created successfully")
+except Exception as e:
+    print(f"❌ Error creating database tables: {e}")
+    print("Make sure PostgreSQL is running and accessible")
+    raise e
 
 # Custom JSON encoder to handle UUIDs and datetimes
 class CustomJSONEncoder(json.JSONEncoder):

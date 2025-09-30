@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 # Database URLs
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "sqlite:///./backend/atoz_bot.db"
+    "postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db"
 )
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
@@ -23,15 +23,42 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 print(f"Database URL: {DATABASE_URL}")
 print(f"Redis URL: {REDIS_URL}")
 
-# Create SQLAlchemy engine
+# Create SQLAlchemy engine with PostgreSQL configuration
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=300,
     pool_size=10,
     max_overflow=20,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    # PostgreSQL specific configuration
+    connect_args={} if "postgresql" in DATABASE_URL else {"check_same_thread": False}
 )
+
+# Test PostgreSQL connection with retry logic
+def test_postgres_connection():
+    """Test PostgreSQL connection with retry logic"""
+    max_retries = 5
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            with engine.connect() as conn:
+                conn.execute("SELECT 1")
+            print("✅ PostgreSQL connection successful")
+            return True
+        except Exception as e:
+            print(f"PostgreSQL connection attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                import time
+                time.sleep(retry_delay)
+            else:
+                print("❌ PostgreSQL connection failed - all retries exhausted")
+                return False
+
+# Test connection on startup
+if "postgresql" in DATABASE_URL:
+    test_postgres_connection()
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
