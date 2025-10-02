@@ -83,20 +83,21 @@ export const useBotStore = create<BotStore>((set, get) => ({
       
       const response = await apiService.startBot();
       
-      if (response.success && response.status === 'running') {
+      // Backend returns the session object directly, not wrapped in success/message
+      if (response.status === 'running' || response.status === 'starting') {
         setStartupStatus('bot_running', 'Bot started successfully');
         
-        // Create session object from response
+        // Use the response directly as it matches BotSession interface
         const session = {
-          id: response.session_id || 'unknown',
+          id: response.id || 'unknown',
           session_name: response.session_name || 'Bot Session',
           start_time: response.start_time || new Date().toISOString(),
-          status: 'running' as const,
-          login_status: 'success' as const,
-          total_checks: 0,
-          total_accepted: 0,
-          total_rejected: 0,
-          created_at: new Date().toISOString()
+          status: response.status as 'running' | 'stopped' | 'error' | 'starting',
+          login_status: response.login_status as 'pending' | 'success' | 'failed' | 'not_started',
+          total_checks: response.total_checks || 0,
+          total_accepted: response.total_accepted || 0,
+          total_rejected: response.total_rejected || 0,
+          created_at: response.created_at || new Date().toISOString()
         };
         
         set({ currentSession: session });
@@ -106,8 +107,8 @@ export const useBotStore = create<BotStore>((set, get) => ({
         get().startStatusPolling();
         
       } else {
-        setError(response.message || 'Failed to start bot');
-        setStartupStatus('error', response.message || 'Failed to start bot');
+        setError('Failed to start bot - unexpected status: ' + response.status);
+        setStartupStatus('error', 'Failed to start bot - unexpected status: ' + response.status);
       }
       
     } catch (error: any) {

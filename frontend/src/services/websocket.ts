@@ -10,12 +10,13 @@ export class WebSocketService {
   constructor(private url: string) {}
 
   connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
+        console.log('Attempting WebSocket connection to:', this.url);
         this.ws = new WebSocket(this.url);
         
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
+          console.log('✅ WebSocket connected successfully');
           this.reconnectAttempts = 0;
           resolve();
         };
@@ -29,17 +30,25 @@ export class WebSocketService {
           }
         };
 
-        this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
+        this.ws.onclose = (event) => {
+          console.log(`WebSocket disconnected (code: ${event.code}, reason: ${event.reason})`);
+          if (event.code === 1001) {
+            console.warn('WebSocket closed with 1001 (going away) - server may not support WebSocket connections');
+            // Don't attempt reconnection for 1001 errors as they indicate server doesn't support WebSocket
+            return;
+          }
           this.handleReconnect();
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          reject(error);
+          console.error('WebSocket connection failed:', error);
+          console.warn('WebSocket endpoint may not be available on the backend');
+          // Resolve instead of reject to prevent app crashes
+          resolve();
         };
       } catch (error) {
-        reject(error);
+        console.error('WebSocket setup failed:', error);
+        resolve(); // Resolve instead of reject to prevent app crashes
       }
     });
   }
@@ -54,13 +63,16 @@ export class WebSocketService {
   private handleReconnect(): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      console.log(`🔄 Attempting WebSocket reconnection... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       setTimeout(() => {
-        this.connect().catch(console.error);
+        this.connect().catch((error) => {
+          console.error('WebSocket reconnection failed:', error);
+        });
       }, this.reconnectInterval);
     } else {
-      console.error('Max reconnection attempts reached');
+      console.warn('⚠️ Max WebSocket reconnection attempts reached - WebSocket functionality disabled');
+      console.info('💡 The app will continue to work without real-time updates');
     }
   }
 

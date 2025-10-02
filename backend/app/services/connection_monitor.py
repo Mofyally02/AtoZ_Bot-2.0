@@ -16,7 +16,7 @@ import psutil
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.app.database.connection import get_db, engine, redis_client
+from app.database.connection import get_db, engine, get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,7 @@ class ConnectionMonitor:
     async def check_redis(self) -> ConnectionStatus:
         """Check Redis connection"""
         try:
+            redis_client = get_redis()
             if redis_client is None:
                 logger.info("Redis client not available - Redis is optional")
                 return ConnectionStatus.HEALTHY  # Show as healthy when not needed
@@ -99,7 +100,7 @@ class ConnectionMonitor:
         try:
             # First check if simple toggle bot is running
             try:
-                from backend.app.api.bot_control import bot_running
+                from app.api.bot_control import bot_running
                 if bot_running:
                     return ConnectionStatus.HEALTHY
             except ImportError:

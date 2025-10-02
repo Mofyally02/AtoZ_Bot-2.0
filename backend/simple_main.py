@@ -8,7 +8,7 @@ import os
 # Add backend to path
 sys.path.insert(0, '/home/mofy/Desktop/Al-Tech Solutions/AtoZ_Bot-2.0/backend')
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
@@ -48,6 +48,15 @@ try:
 except ImportError as e:
     print(f"❌ Connection monitor import failed: {e}")
     connection_monitor = None
+
+try:
+    from app.api.websocket import websocket_endpoint
+    print("✅ WebSocket endpoint import successful")
+    WEBSOCKET_AVAILABLE = True
+except ImportError as e:
+    print(f"❌ WebSocket endpoint import failed: {e}")
+    WEBSOCKET_AVAILABLE = False
+    websocket_endpoint = None
 
 # Create FastAPI app
 app = FastAPI(title="AtoZ Bot Dashboard API", version="1.0.0")
@@ -137,8 +146,19 @@ async def debug_info():
         "bot_router_available": bot_router is not None,
         "bot_service_available": bot_service is not None,
         "connection_monitor_available": connection_monitor is not None,
+        "websocket_available": WEBSOCKET_AVAILABLE,
         "routes": [route.path for route in app.routes]
     }
+
+# Add WebSocket endpoint
+if WEBSOCKET_AVAILABLE and websocket_endpoint:
+    @app.websocket("/ws")
+    async def websocket_route(websocket: WebSocket):
+        """WebSocket endpoint for real-time updates"""
+        await websocket_endpoint(websocket)
+    print("✅ WebSocket endpoint added at /ws")
+else:
+    print("❌ WebSocket endpoint not available")
 
 @app.on_event("startup")
 async def startup_event():

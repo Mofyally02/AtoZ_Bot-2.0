@@ -11,9 +11,9 @@ from typing import Any, Dict, List, Optional
 import psutil
 from sqlalchemy.orm import Session
 
-from backend.app.database.connection import get_redis
-from backend.app.models.bot_models import (AnalyticsPeriod, BotSession,
-                                           JobRecord, SystemLog)
+from app.database.connection import get_redis
+from app.models.bot_models import (AnalyticsPeriod, BotSession,
+                                    JobRecord, SystemLog)
 
 
 class BotService:

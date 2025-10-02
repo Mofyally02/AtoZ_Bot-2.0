@@ -1,0 +1,13 @@
+
+> atoz-bot-frontend@0.0.0 dev
+> vite
+
+Port 5173 is in use, trying another one...
+Port 5174 is in use, trying another one...
+
+  VITE v4.5.14  ready in 1172 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: http://192.168.2.101:5175/
+  ➜  Network: http://172.20.0.1:5175/
+  ➜  press h to show help

@@ -29,14 +29,36 @@ function App() {
     // Apply theme on mount
     document.documentElement.classList.toggle('dark', theme === 'dark');
     
-    // Refresh bot status on mount
-    refreshStatus();
+    // Initialize connections with proper error handling
+    const initializeConnections = async () => {
+      try {
+        console.log('🔄 Initializing frontend connections...');
+        
+        // First try to refresh status
+        await refreshStatus();
+        console.log('✅ API connection established');
+        
+        // Then connect WebSocket for real-time updates
+        await connectWebSocket();
+        console.log('✅ WebSocket connection established');
+        
+      } catch (error) {
+        console.error('❌ Failed to initialize connections:', error);
+        // Don't throw - let the app continue with degraded functionality
+      }
+    };
     
-    // Connect to WebSocket for real-time updates
-    connectWebSocket();
+    // Initialize connections
+    initializeConnections();
     
     // Set up periodic status refresh as fallback
-    const interval = setInterval(refreshStatus, 30000); // Every 30 seconds
+    const interval = setInterval(async () => {
+      try {
+        await refreshStatus();
+      } catch (error) {
+        console.error('Failed to refresh status:', error);
+      }
+    }, 30000); // Every 30 seconds
     
     return () => {
       clearInterval(interval);
@@ -46,7 +68,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-secondary-50 dark:bg-secondary-900 transition-colors duration-200">
           <Layout>
             <Routes>

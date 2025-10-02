@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from backend.app.database.connection import Base
+from app.database.connection import Base
 
 
 class BotSession(Base):

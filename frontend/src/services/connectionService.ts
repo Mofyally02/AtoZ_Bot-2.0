@@ -39,12 +39,8 @@ class ConnectionService {
     this.startMonitoring();
     // Load initial status immediately
     this.checkConnections();
-    // Also force a detailed status check
-    this.getDetailedStatus().then(status => {
-      if (status) {
-        this.updateStatus(status);
-      }
-    });
+    // Note: checkConnections() already handles status updates,
+    // so we don't need a separate getDetailedStatus() call
   }
 
   /**
@@ -110,14 +106,36 @@ class ConnectionService {
   async checkConnections(): Promise<void> {
     try {
       console.log('Checking connections...');
-      await apiService.healthCheck();
-      const detailedResponse = await this.getDetailedStatus();
       
-      if (detailedResponse) {
-        console.log('Detailed status received:', detailedResponse.overallStatus);
-        this.updateStatus(detailedResponse);
-        this.reconnectAttempts = 0; // Reset on successful check
+      // Try to get detailed status first
+      const detailedStatus = await this.getDetailedStatus();
+      if (detailedStatus) {
+        console.log('Detailed status received:', detailedStatus.overallStatus);
+        this.updateStatus(detailedStatus);
+        this.reconnectAttempts = 0;
+        return;
       }
+      
+      // Fallback to basic health check
+      const healthResponse = await apiService.healthCheck();
+      console.log('Health check successful:', healthResponse);
+      
+      const basicStatus: ConnectionStatus = {
+        overallStatus: healthResponse.status === 'healthy' ? 'healthy' : 'degraded',
+        services: {
+          database: { status: 'unknown', retryCount: 0 },
+          redis: { status: 'unknown', retryCount: 0 },
+          bot_process: { status: 'unknown', retryCount: 0 },
+          external_api: { status: 'healthy', retryCount: 0 },
+          websocket: { status: 'unknown', retryCount: 0 }
+        },
+        monitoringActive: true,
+        checkInterval: this.checkInterval
+      };
+      
+      this.updateStatus(basicStatus);
+      this.reconnectAttempts = 0;
+      
     } catch (error) {
       console.error('Connection check failed:', error);
       this.handleConnectionError();
@@ -125,17 +143,52 @@ class ConnectionService {
   }
 
   /**
-   * Get detailed connection status
+   * Get detailed connection status (fallback to basic health check)
    */
   async getDetailedStatus(): Promise<ConnectionStatus | null> {
     try {
-      const response = await fetch('http://localhost:8000/health/detailed');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/health/detailed`);
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        console.warn('Detailed health endpoint not available, falling back to basic check');
+        return null;
       }
+      
       const data = await response.json();
-      console.log('Received detailed status from backend:', data.overall_status);
-      return data;
+      console.log('Received detailed status from backend:', data);
+      
+      // Map backend response to frontend format
+      const status: ConnectionStatus = {
+        overallStatus: data.overall_status === 'healthy' ? 'healthy' : 
+                      data.overall_status === 'degraded' ? 'degraded' : 'unknown',
+        services: {
+          database: { 
+            status: data.services?.database?.status || 'unknown', 
+            retryCount: data.services?.database?.retry_count || 0 
+          },
+          redis: { 
+            status: data.services?.redis?.status || 'unknown', 
+            retryCount: data.services?.redis?.retry_count || 0 
+          },
+          bot_process: { 
+            status: data.services?.bot_process?.status || 'unknown', 
+            retryCount: data.services?.bot_process?.retry_count || 0 
+          },
+          external_api: { 
+            status: data.services?.external_api?.status || 'unknown', 
+            retryCount: data.services?.external_api?.retry_count || 0 
+          },
+          websocket: { 
+            status: data.services?.websocket?.status || 'unknown', 
+            retryCount: data.services?.websocket?.retry_count || 0 
+          }
+        },
+        monitoringActive: data.monitoring_active || false,
+        checkInterval: data.check_interval || this.checkInterval
+      };
+      
+      return status;
     } catch (error) {
       console.error('Failed to get detailed status:', error);
       return null;
@@ -143,41 +196,51 @@ class ConnectionService {
   }
 
   /**
-   * Check a specific service
+   * Check a specific service (fallback to basic health check)
    */
   async checkService(serviceName: string): Promise<ServiceStatus | null> {
     try {
-      const response = await fetch(`http://localhost:8000/health/service/${serviceName}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
+      // Since specific service endpoints don't exist, use basic health check
+      const healthResponse = await apiService.healthCheck();
       return {
-        status: data.status,
-        lastCheck: data.timestamp,
+        status: healthResponse.status === 'healthy' ? 'healthy' : 'unhealthy',
+        lastCheck: new Date().toISOString(),
         retryCount: 0
       };
     } catch (error) {
       console.error(`Failed to check service ${serviceName}:`, error);
-      return null;
+      return {
+        status: 'unhealthy',
+        lastCheck: new Date().toISOString(),
+        retryCount: 1
+      };
     }
   }
 
   /**
-   * Force check all services
+   * Force check all services (fallback to basic health check)
    */
   async forceCheckAll(): Promise<void> {
     try {
       console.log('Force checking all services...');
-      const response = await fetch('http://localhost:8000/health/force-check', { method: 'POST' });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
-      if (data.status) {
-        console.log('Force check returned status:', data.status.overall_status);
-        this.updateStatus(data.status);
-      }
+      // Use basic health check since /health/force-check doesn't exist
+      const healthResponse = await apiService.healthCheck();
+      
+      const status: ConnectionStatus = {
+        overallStatus: healthResponse.status === 'healthy' ? 'healthy' : 'degraded',
+        services: {
+          database: { status: 'unknown', retryCount: 0 },
+          redis: { status: 'unknown', retryCount: 0 },
+          bot_process: { status: 'unknown', retryCount: 0 },
+          external_api: { status: 'healthy', retryCount: 0 },
+          websocket: { status: 'unknown', retryCount: 0 }
+        },
+        monitoringActive: true,
+        checkInterval: this.checkInterval
+      };
+      
+      console.log('Force check completed with status:', status.overallStatus);
+      this.updateStatus(status);
     } catch (error) {
       console.error('Failed to force check all services:', error);
     }
