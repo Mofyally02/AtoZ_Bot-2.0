@@ -1,235 +1,188 @@
-import { Moon, RotateCcw, Save, Sun } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import { Moon, Sun, Settings as SettingsIcon, Monitor, Smartphone, Tablet } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
-import { apiService } from '../services/api';
 import { useBotStore } from '../stores/botStore';
-
-const defaultSettings = {
-  check_interval_seconds: 0.5,
-  results_report_interval_seconds: 5,
-  rejected_report_interval_seconds: 43200,
-  quick_check_interval_seconds: 10,
-  enable_quick_check: false,
-  enable_results_reporting: true,
-  enable_rejected_reporting: true,
-  max_accept_per_run: 5,
-  job_type_filter: 'Telephone interpreting',
-};
+import DynamicSettingsForm from '../components/settings/DynamicSettingsForm';
+import ConfigurationPresets from '../components/settings/ConfigurationPresets';
+import { SettingsProvider, useSettings } from '../components/settings/SettingsStore';
 
 const Settings: React.FC = () => {
-  const { theme, toggleTheme } = useBotStore();
-  const [settings, setSettings] = useState(defaultSettings);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    setIsLoading(true);
-    try {
-      const config = await apiService.getBotConfiguration();
-      setSettings(config);
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-      toast.error('Failed to load settings');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      await apiService.updateBotConfiguration(settings);
-      toast.success('Settings saved successfully');
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      toast.error('Failed to save settings');
-    }
-  };
-
-  const handleReset = async () => {
-    try {
-      await apiService.updateBotConfiguration(defaultSettings);
-      setSettings(defaultSettings);
-      toast.success('Settings reset to default');
-    } catch (error) {
-      console.error('Failed to reset settings:', error);
-      toast.error('Failed to reset settings');
-    }
-  };
-
-  const updateSetting = (key: string, value: any) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  const InputField = ({ label, type, key, value, onChange, min, max, step, description }: any) => (
-    <div>
-      <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
-        {label}
-      </label>
-      <input
-        type={type}
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(key, type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-        disabled={isLoading}
-        className="w-full px-3 py-2 border border-secondary-300 dark:border-secondary-600 rounded-lg bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-      />
-      {description && (
-        <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1">{description}</p>
-      )}
-    </div>
+  return (
+    <SettingsProvider>
+      <SettingsContent />
+    </SettingsProvider>
   );
+};
+
+const SettingsContent: React.FC = () => {
+  const { theme, toggleTheme } = useBotStore();
+  const { state: settingsState, actions } = useSettings();
+  const [activeTab, setActiveTab] = useState<'form' | 'presets'>('form');
+  const [deviceView, setDeviceView] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+
+  const handlePresetSelect = async (config: any) => {
+    try {
+      await actions.updateConfiguration(config);
+      // Refresh the settings to show the updated configuration
+      await actions.refreshSettings();
+    } catch (error) {
+      console.error('Failed to apply preset:', error);
+      throw error; // Re-throw to let the preset component handle the error
+    }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
+  };
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
           <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-          <p className="text-muted-foreground mt-1">Configure bot behavior and preferences</p>
+          <p className="text-muted-foreground">
+            Configure bot behavior with dynamic, responsive controls
+          </p>
         </div>
-        <Button variant="ghost" onClick={toggleTheme} className="flex items-center space-x-2">
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          <span>{theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
-        </Button>
-      </div>
-
-      {/* Bot Configuration */}
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold text-card-foreground mb-6">
-          Bot Configuration
-          {isLoading && (
-            <div className="inline-flex items-center ml-3">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
-              <span className="ml-2 text-sm text-secondary-600 dark:text-secondary-400">Loading...</span>
-            </div>
-          )}
-        </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <InputField
-            label="Check Interval (seconds)"
-            type="number"
-            key="check_interval_seconds"
-            value={settings.check_interval_seconds}
-            onChange={updateSetting}
-            min={0.1}
-            max={10}
-            step={0.1}
-            description="How often the bot checks for new jobs"
-          />
-
-          <InputField
-            label="Results Report Interval (seconds)"
-            type="number"
-            key="results_report_interval_seconds"
-            value={settings.results_report_interval_seconds}
-            onChange={updateSetting}
-            min={1}
-            max={300}
-            description="How often to report accepted/rejected jobs"
-          />
-
-          <InputField
-            label="Rejected Report Interval (seconds)"
-            type="number"
-            key="rejected_report_interval_seconds"
-            value={settings.rejected_report_interval_seconds}
-            onChange={updateSetting}
-            min={60}
-            description={`Currently: ${Math.round(settings.rejected_report_interval_seconds / 3600)}h`}
-          />
-
-          <InputField
-            label="Quick Check Interval (seconds)"
-            type="number"
-            key="quick_check_interval_seconds"
-            value={settings.quick_check_interval_seconds}
-            onChange={updateSetting}
-            min={5}
-            max={300}
-            description="How often to perform quick job checks"
-          />
-
-          <InputField
-            label="Max Accept Per Run"
-            type="number"
-            key="max_accept_per_run"
-            value={settings.max_accept_per_run}
-            onChange={updateSetting}
-            min={1}
-            max={50}
-            description="Maximum jobs to accept in a single run"
-          />
-
-          <div>
-            <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
-              Job Type Filter
-            </label>
-            <select
-              value={settings.job_type_filter}
-              onChange={(e) => updateSetting('job_type_filter', e.target.value)}
-              disabled={isLoading}
-              className="w-full px-3 py-2 border border-secondary-300 dark:border-secondary-600 rounded-lg bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+        <div className="flex items-center space-x-4">
+          {/* Device View Toggle */}
+          <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setDeviceView('desktop')}
+              className={`p-2 rounded-md transition-colors ${
+                deviceView === 'desktop' 
+                  ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+              title="Desktop View"
             >
-              <option value="Telephone interpreting">Telephone interpreting</option>
-              <option value="Face-to-Face">Face-to-Face</option>
-              <option value="Video interpreting">Video interpreting</option>
-              <option value="Onsite">Onsite</option>
-            </select>
-            <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1">
-              Type of jobs to accept
-            </p>
+              <Monitor className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setDeviceView('tablet')}
+              className={`p-2 rounded-md transition-colors ${
+                deviceView === 'tablet' 
+                  ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+              title="Tablet View"
+            >
+              <Tablet className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setDeviceView('mobile')}
+              className={`p-2 rounded-md transition-colors ${
+                deviceView === 'mobile' 
+                  ? 'bg-white dark:bg-gray-700 text-primary-600 shadow-sm' 
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+              title="Mobile View"
+            >
+              <Smartphone className="w-4 h-4" />
+            </button>
           </div>
-        </div>
 
-        {/* Feature Toggles */}
-        <div className="mt-6">
-          <h3 className="text-lg font-medium text-secondary-900 dark:text-white mb-4">
-            Feature Toggles
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { key: 'enable_quick_check', label: 'Enable Quick Check' },
-              { key: 'enable_results_reporting', label: 'Enable Results Reporting' },
-              { key: 'enable_rejected_reporting', label: 'Enable Rejected Reporting' }
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  checked={settings[key as keyof typeof settings] as boolean}
-                  onChange={(e) => updateSetting(key, e.target.checked)}
-                  disabled={isLoading}
-                  className="w-4 h-4 text-primary-600 bg-secondary-100 border-secondary-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-secondary-800 focus:ring-2 dark:bg-secondary-700 dark:border-secondary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-sm font-medium text-secondary-700 dark:text-secondary-300">
-                  {label}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 mt-8">
-          <Button variant="secondary" onClick={handleReset} disabled={isLoading}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
-          </Button>
-          <Button onClick={handleSave} disabled={isLoading}>
-            <Save className="w-4 h-4 mr-2" />
-            Save Settings
+          {/* Theme Toggle */}
+          <Button variant="ghost" onClick={toggleTheme} className="flex items-center space-x-2">
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <span>{theme === 'dark' ? 'Light' : 'Dark'} Mode</span>
           </Button>
         </div>
-      </Card>
-    </div>
+      </motion.div>
+
+      {/* Tab Navigation */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-0 overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <nav className="flex space-x-8 px-6">
+              <button
+                onClick={() => setActiveTab('form')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'form'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                <SettingsIcon className="w-4 h-4 inline mr-2" />
+                Dynamic Configuration
+              </button>
+              <button
+                onClick={() => setActiveTab('presets')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'presets'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Configuration Presets
+              </button>
+            </nav>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Tab Content */}
+      <motion.div variants={itemVariants}>
+        {activeTab === 'form' ? (
+          <DynamicSettingsForm
+            onSave={(config) => {
+              console.log('Configuration saved:', config);
+            }}
+            onReset={() => {
+              console.log('Configuration reset');
+            }}
+            showAdvanced={false}
+          />
+        ) : (
+          <ConfigurationPresets
+            onPresetSelect={handlePresetSelect}
+            currentConfig={settingsState.activeConfiguration}
+            isLoading={settingsState.isLoading}
+          />
+        )}
+      </motion.div>
+
+      {/* Responsive Preview */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-4 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-white">
+                Responsive Preview
+              </h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Current view: {deviceView} - Settings adapt automatically to screen size
+              </p>
+            </div>
+            <div className="text-xs text-gray-400">
+              {deviceView === 'desktop' && '≥ 1024px'}
+              {deviceView === 'tablet' && '768px - 1023px'}
+              {deviceView === 'mobile' && '< 768px'}
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 };
 

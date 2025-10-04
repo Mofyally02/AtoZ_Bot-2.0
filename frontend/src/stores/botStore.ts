@@ -15,6 +15,7 @@ interface BotStore {
   startupStatus: string | null;
   startupMessage: string | null;
   statusPollingInterval: number | null;
+  loginStartTime: Date | null;
   
   // Actions
   setBotStatus: (status: BotStatus) => void;
@@ -24,6 +25,7 @@ interface BotStore {
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
   setStartupStatus: (status: string | null, message?: string | null) => void;
+  setLoginStartTime: (time: Date | null) => void;
   toggleTheme: () => void;
   startBot: (sessionName?: string) => Promise<void>;
   stopBot: () => Promise<void>;
@@ -47,6 +49,7 @@ export const useBotStore = create<BotStore>((set, get) => ({
   startupStatus: null,
   startupMessage: null,
   statusPollingInterval: null,
+  loginStartTime: null,
   
   // Actions
   setBotStatus: (status) => set({ botStatus: status }),
@@ -66,6 +69,8 @@ export const useBotStore = create<BotStore>((set, get) => ({
     startupMessage: message || null 
   }),
   
+  setLoginStartTime: (time) => set({ loginStartTime: time }),
+  
   toggleTheme: () => {
     const newTheme = get().theme === 'light' ? 'dark' : 'light';
     set({ theme: newTheme });
@@ -74,7 +79,15 @@ export const useBotStore = create<BotStore>((set, get) => ({
   },
   
   startBot: async () => {
-    const { setLoading, setError, setStartupStatus, refreshStatus } = get();
+    const { setLoading, setError, setStartupStatus, refreshStatus, botStatus } = get();
+    
+    // Check if bot is already running
+    if (botStatus?.is_running) {
+      const errorMessage = 'Bot is already running. Please stop the current bot before starting a new one.';
+      setError(errorMessage);
+      setStartupStatus('error', 'Bot is already running');
+      throw new Error(errorMessage);
+    }
     
     try {
       setLoading(true);
@@ -113,8 +126,28 @@ export const useBotStore = create<BotStore>((set, get) => ({
       
     } catch (error: any) {
       console.error('Failed to start bot:', error);
-      setError(error.message || 'Failed to start bot');
-      setStartupStatus('error', error.message || 'Failed to start bot');
+      
+      // Handle specific error cases
+      let errorMessage = 'Failed to start bot';
+      
+      if (error.response?.status === 400) {
+        const detail = error.response?.data?.detail;
+        if (detail === 'Bot is already running') {
+          errorMessage = 'Bot is already running. Please stop the current bot before starting a new one.';
+          setStartupStatus('error', 'Bot is already running');
+        } else if (detail) {
+          errorMessage = `Bad Request: ${detail}`;
+        }
+      } else if (error.response?.status === 503) {
+        errorMessage = 'Service unavailable. Please check that all required services are running.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      setStartupStatus('error', errorMessage);
       throw error;
     } finally {
       setLoading(false);
@@ -152,13 +185,19 @@ export const useBotStore = create<BotStore>((set, get) => ({
   },
   
   refreshStatus: async () => {
-    const { setError, setConnected } = get();
+    const { setError, setConnected, loginStartTime } = get();
     
     try {
       const status = await apiService.getLiveBotStatus();
       set({ botStatus: status });
       setConnected(true);
       setError(null); // Clear any previous errors
+      
+      // If bot is running but we don't have a login start time, set it now
+      if (status.is_running && !loginStartTime) {
+        console.log('BotStore: Bot is running but no loginStartTime, setting it now');
+        get().setLoginStartTime(new Date());
+      }
     } catch (error: any) {
       console.error('Failed to refresh bot status:', error);
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to refresh bot status';
@@ -303,37 +342,22 @@ export const useBotStore = create<BotStore>((set, get) => ({
         
       case 'running':
         setStartupStatus('logged_in', 'Successfully logged in! Bot is now running...');
+        // Set login start time when bot actually starts running
+        console.log('BotStore: Setting loginStartTime to:', new Date());
+        get().setLoginStartTime(new Date());
         break;
         
       case 'cycle_complete':
         if (update.data.stats) {
-          setBotStatus({
-            is_running: true,
-            session_id: get().currentSession?.id || null,
-            session_name: get().currentSession?.session_name || null,
-            start_time: get().currentSession?.start_time || null,
-            status: 'running',
-            login_status: 'success',
-            total_checks: update.data.stats.total_checks || 0,
-            total_accepted: update.data.stats.total_accepted || 0,
-            total_rejected: update.data.stats.total_rejected || 0
-          });
+          // Don't update UI directly - let polling handle it to avoid conflicts
+          console.log('🔄 Cycle complete, will sync via polling');
         }
         break;
         
       case 'database_update':
         if (update.data.session_id) {
-          setBotStatus({
-            is_running: true,
-            session_id: update.data.session_id,
-            session_name: get().currentSession?.session_name || null,
-            start_time: get().currentSession?.start_time || null,
-            status: update.data.status || 'running',
-            login_status: update.data.login_status || 'success',
-            total_checks: update.data.total_checks || 0,
-            total_accepted: update.data.total_accepted || 0,
-            total_rejected: update.data.total_rejected || 0
-          });
+          // Don't update UI directly - let polling handle it to avoid conflicts
+          console.log('📊 Database update received, will sync via polling');
         }
         break;
         
@@ -355,6 +379,8 @@ export const useBotStore = create<BotStore>((set, get) => ({
           total_accepted: 0,
           total_rejected: 0
         });
+        // Clear login start time when bot stops
+        get().setLoginStartTime(null);
         break;
         
       case 'stopped':
@@ -407,17 +433,8 @@ export const useBotStore = create<BotStore>((set, get) => ({
         break;
         
       case 'job_processing_complete':
-        if (update.data.total_checks !== undefined && botStatus) {
-          setBotStatus({
-            ...botStatus,
-            total_checks: update.data.total_checks,
-            total_accepted: update.data.total_accepted || 0,
-            total_rejected: update.data.total_rejected || 0,
-            is_running: botStatus.is_running,
-            status: botStatus.status || 'running', // Ensure status is properly typed
-          });
-        }
-        console.log(`📊 Job Processing Complete: ${update.data.message}`);
+        // Don't update UI directly - let polling handle it to avoid conflicts
+        console.log(`📊 Job Processing Complete: ${update.data.message}, will sync via polling`);
         break;
         
       default:
@@ -431,17 +448,17 @@ export const useBotStore = create<BotStore>((set, get) => ({
     // Stop any existing polling
     stopStatusPolling();
     
-    // Start new polling every 5 minutes
+    // Start new polling every 30 seconds (more frequent to catch DB updates)
     const interval = setInterval(async () => {
       try {
         await refreshStatus();
       } catch (error) {
         console.error('Error polling status:', error);
       }
-    }, 300000); // 5 minutes = 300,000 milliseconds
+    }, 30000); // 30 seconds = 30,000 milliseconds
     
     set({ statusPollingInterval: interval });
-    console.log('🔄 Started status polling (every 5 minutes)');
+    console.log('🔄 Started status polling (every 30 seconds)');
   },
 
   stopStatusPolling: () => {

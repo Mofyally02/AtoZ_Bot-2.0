@@ -232,7 +232,7 @@ async def realtime_update(update_data: dict):
         print(f"[{datetime.now()}] 📡 Real-time update received: {update_data.get('type', 'unknown')}")
         
         # Handle different types of updates
-        update_type = update_data.get('type', '')
+        update_type = update_data.get('update_type', '') or update_data.get('type', '')
         data = update_data.get('data', {})
         
         if update_type == "database_update":
@@ -244,33 +244,68 @@ async def realtime_update(update_data: dict):
             total_rejected = data.get('total_rejected', 0)
             login_status = data.get('login_status', 'unknown')
             
+            print(f"[{datetime.now()}] 🔄 Processing database update for session {session_id}: {total_checks} checks")
+            
             if session_id:
                 try:
                     from app.database.connection import get_db
                     from sqlalchemy import text
                     
+                    print(f"[{datetime.now()}] 📊 Getting database connection...")
                     db = next(get_db())
                     if db:
-                        # Update or create session
-                        db.execute(text("""
-                            INSERT OR REPLACE INTO bot_sessions 
-                            (id, session_name, status, login_status, total_checks, total_accepted, total_rejected, created_at, updated_at)
-                            VALUES (:id, :session_name, :status, :login_status, :checks, :accepted, :rejected, :created_at, :updated_at)
+                        print(f"[{datetime.now()}] ✅ Database connection established")
+                        # Update existing session (PostgreSQL compatible)
+                        print(f"[{datetime.now()}] 🔄 Executing UPDATE query...")
+                        result = db.execute(text("""
+                            UPDATE bot_sessions 
+                            SET status = :status,
+                                login_status = :login_status,
+                                total_checks = :checks,
+                                total_accepted = :accepted,
+                                total_rejected = :rejected,
+                                updated_at = :updated_at
+                            WHERE id = :id
                         """), {
                             'id': session_id,
-                            'session_name': f"real-atoz-session-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                             'status': status,
                             'login_status': login_status,
                             'checks': total_checks,
                             'accepted': total_accepted,
                             'rejected': total_rejected,
-                            'created_at': datetime.now(timezone.utc).isoformat(),
                             'updated_at': datetime.now(timezone.utc).isoformat()
                         })
+                        
+                        print(f"[{datetime.now()}] 📊 UPDATE result: {result.rowcount} rows affected")
+                        
+                        # Check if any rows were updated
+                        if result.rowcount == 0:
+                            print(f"[{datetime.now()}] ⚠️ No session found with ID {session_id}, creating new one")
+                            # Create new session if it doesn't exist
+                            db.execute(text("""
+                                INSERT INTO bot_sessions 
+                                (id, session_name, status, login_status, total_checks, total_accepted, total_rejected, created_at, updated_at)
+                                VALUES (:id, :session_name, :status, :login_status, :checks, :accepted, :rejected, :created_at, :updated_at)
+                            """), {
+                                'id': session_id,
+                                'session_name': f"bot-session-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                                'status': status,
+                                'login_status': login_status,
+                                'checks': total_checks,
+                                'accepted': total_accepted,
+                                'rejected': total_rejected,
+                                'created_at': datetime.now(timezone.utc).isoformat(),
+                                'updated_at': datetime.now(timezone.utc).isoformat()
+                            })
+                            print(f"[{datetime.now()}] ✅ New session created")
+                        
+                        print(f"[{datetime.now()}] 💾 Committing transaction...")
                         db.commit()
-                        print(f"[{datetime.now()}] 💾 Database updated: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
+                        print(f"[{datetime.now()}] ✅ Database updated: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
                 except Exception as e:
                     print(f"[{datetime.now()}] ❌ Database update error: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         return {"status": "update_received", "type": update_type}
         
@@ -427,8 +462,13 @@ async def start_bot(
                 'REDIS_URL': 'redis://localhost:6379',
                 'ATOZ_BASE_URL': 'https://portal.atozinterpreting.com',
                 'ATOZ_USERNAME': 'hussain02747@gmail.com',
-                'ATOZ_PASSWORD': 'Ngoma2003#'
+                'ATOZ_PASSWORD': 'Ngoma2003#',
+                'API_BASE_URL': 'http://localhost:8000'
             })
+            
+            print(f"[DEBUG] Starting bot process: {python_executable} {os.path.basename(bot_script)} {session.id}")
+            print(f"[DEBUG] Working directory: {bot_path}")
+            print(f"[DEBUG] Bot script exists: {os.path.exists(bot_script)}")
             
             bot_process = subprocess.Popen(
                 [python_executable, os.path.basename(bot_script), str(session.id)],
@@ -438,6 +478,9 @@ async def start_bot(
                 preexec_fn=os.setsid if os.name != 'nt' else None,
                 env=bot_env
             )
+            
+            print(f"[DEBUG] Bot process started with PID: {bot_process.pid}")
+            print(f"[DEBUG] Bot process status: {bot_process.poll()}")
         except Exception as e:
             await send_realtime_update("bot_error", {
                 "status": "error",
@@ -469,7 +512,7 @@ async def start_bot(
         db.commit()
         
         # Start background monitoring
-        background_tasks.add_task(monitor_bot_process, session.id, db)
+        background_tasks.add_task(monitor_bot_process, str(session.id), db)
         
         # Return immediately after starting the process
         return BotSessionResponse(
@@ -627,34 +670,18 @@ async def stop_bot(db: Session = Depends(get_db)):
 
 @router.get("/status", response_model=BotStatusResponse)
 async def get_bot_status(db: Session = Depends(get_db)):
-    """Get current bot status using proper state management"""
+    """Get current bot status using database as source of truth"""
     print(f"\n📊 STATUS REQUEST:")
-    print(f"   Bot state: {bot_state.is_running()}")
     
-    is_running = bot_state.is_running()
-    
-    # If bot is not running, return basic status immediately
-    if not is_running:
-        return BotStatusResponse(
-            is_running=False,
-            session_id=None,
-            session_name="No active session",
-            start_time=None,
-            status="stopped",
-            login_status="not_started",
-            total_checks=0,
-            total_accepted=0,
-            total_rejected=0
-        )
-    
-    # Get current session only if bot is running
+    # Get current session from database (source of truth)
     current_session = db.query(BotSession).filter(
         BotSession.status == "running"
     ).first()
     
     if current_session:
+        print(f"   Found running session: {current_session.session_name}")
         return BotStatusResponse(
-            is_running=is_running,
+            is_running=True,
             session_id=str(current_session.id),
             session_name=current_session.session_name,
             start_time=current_session.start_time,
@@ -665,14 +692,15 @@ async def get_bot_status(db: Session = Depends(get_db)):
             total_rejected=current_session.total_rejected
         )
     
-    # If no running session, return basic status
+    # No running session found
+    print(f"   No running session found")
     return BotStatusResponse(
-        is_running=is_running,
+        is_running=False,
         session_id=None,
-        session_name="Starting...",
+        session_name="No active session",
         start_time=None,
-        status="starting",
-        login_status="attempting",
+        status="stopped",
+        login_status="not_started",
         total_checks=0,
         total_accepted=0,
         total_rejected=0
@@ -776,7 +804,7 @@ async def get_bot_configuration(db: Session = Depends(get_db)):
         # Return default configuration if none exists
         default_config = BotConfiguration(
             config_name="default",
-            check_interval_seconds=0.5,
+            check_interval_seconds=10.0,
             results_report_interval_seconds=5,
             rejected_report_interval_seconds=43200,
             quick_check_interval_seconds=10,
@@ -792,7 +820,7 @@ async def get_bot_configuration(db: Session = Depends(get_db)):
         db.refresh(default_config)
         config = default_config
     
-    return BotConfigurationResponse.from_orm(config)
+    return BotConfigurationResponse.model_validate(config)
 
 @router.put("/configuration", response_model=BotConfigurationResponse)
 async def update_bot_configuration(
@@ -810,25 +838,70 @@ async def update_bot_configuration(
         db.add(config)
     
     # Update configuration fields
-    for field, value in config_data.dict(exclude={'id', 'created_at', 'updated_at'}).items():
+    for field, value in config_data.model_dump(exclude={'id', 'created_at', 'updated_at'}).items():
         setattr(config, field, value)
     
     db.commit()
     db.refresh(config)
-    return BotConfigurationResponse.from_orm(config)
+    
+    # Send real-time update about configuration change
+    try:
+        from app.api.websocket import manager
+        await manager.broadcast({
+            "type": "configuration_updated",
+            "data": {
+                "config_name": config.config_name,
+                "check_interval_seconds": float(config.check_interval_seconds),
+                "max_accept_per_run": config.max_accept_per_run,
+                "job_type_filter": config.job_type_filter,
+                "message": f"Configuration '{config.config_name}' has been updated"
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        print(f"Failed to broadcast configuration update: {e}")
+    
+    return BotConfigurationResponse.model_validate(config)
+
+@router.post("/configuration/refresh")
+async def refresh_bot_configuration():
+    """Signal bot to refresh its configuration from database"""
+    try:
+        from app.api.websocket import manager
+        await manager.broadcast({
+            "type": "config_refresh_requested",
+            "data": {
+                "message": "Bot configuration refresh requested"
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        return {"status": "success", "message": "Configuration refresh signal sent"}
+    except Exception as e:
+        print(f"Failed to send configuration refresh signal: {e}")
+        return {"status": "error", "message": f"Failed to send refresh signal: {e}"}
 
 async def monitor_bot_process(session_id: str, db: Session):
     """Background task to monitor bot process"""
     global bot_process
     
+    print(f"[MONITOR] Starting bot process monitoring for session {session_id}")
+    
+    # Wait a moment for the bot to start
+    await asyncio.sleep(2)
+    
     while bot_process and bot_process.poll() is None:
         try:
+            print(f"[MONITOR] Bot process {bot_process.pid} is running")
+            
             # Update session with current metrics
             session = db.query(BotSession).filter(BotSession.id == session_id).first()
             if session:
-                # Update login status if not already set
+                # Update login status if not already set and enough time has passed
                 if session.login_status == "attempting":
+                    # Wait for bot to attempt login
+                    await asyncio.sleep(5)
                     session.login_status = "success"
+                    session.status = "running"
                 
                 db.commit()
                 
@@ -847,7 +920,7 @@ async def monitor_bot_process(session_id: str, db: Session):
                     }
                 })
             
-            await asyncio.sleep(10)  # Check every 10 seconds
+            await asyncio.sleep(15)  # Check every 15 seconds
             
         except Exception as e:
             # Log error
@@ -859,10 +932,11 @@ async def monitor_bot_process(session_id: str, db: Session):
             )
             db.add(log_entry)
             db.commit()
-            print(f"Bot monitoring error: {e}")
+            print(f"[MONITOR] Bot monitoring error: {e}")
             break
     
     # Bot process ended
+    print(f"[MONITOR] Bot process ended for session {session_id}")
     session = db.query(BotSession).filter(BotSession.id == session_id).first()
     if session and session.status == "running":
         session.status = "stopped"
@@ -887,7 +961,7 @@ async def monitor_bot_process(session_id: str, db: Session):
 async def send_realtime_update(update_type: str, data: dict):
     """Send real-time update to all connected WebSocket clients"""
     try:
-        from simple_main import manager
+        from app.api.websocket import manager
         update_data = {
             "type": update_type,
             "data": data,
@@ -896,3 +970,5 @@ async def send_realtime_update(update_type: str, data: dict):
         await manager.broadcast(json.dumps(update_data, cls=CustomJSONEncoder))
     except Exception as e:
         print(f"Error sending real-time update: {e}")
+
+

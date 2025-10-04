@@ -2,16 +2,16 @@
 
 ## Overview
 
-This document describes the Redis integration for the AtoZ Bot Dashboard, which provides real-time bot state management, task queuing, and improved performance over the current SQLite-only approach.
+This document describes the Redis integration for the AtoZ Bot Dashboard, which provides real-time bot state management, task queuing, and improved performance over the current PostgreSQL-only approach.
 
 ## Why Redis?
 
-### Current Issues with SQLite-Only Approach
+### Current Issues with PostgreSQL-Only Approach
 1. **Global Variables**: Using `bot_process` global variable is unreliable in multi-instance deployments
 2. **Database Polling**: Bot status requires frequent database queries for real-time updates
 3. **No Task Queues**: No queuing system for bot tasks or job processing
-4. **Session Management**: Sessions stored in SQLite, not optimized for real-time state
-5. **Scalability**: SQLite doesn't scale well for concurrent operations
+4. **Session Management**: Sessions stored in PostgreSQL, not optimized for real-time state
+5. **Scalability**: PostgreSQL polling doesn't scale well for real-time operations
 
 ### Redis Benefits
 1. **Real-time State Management**: Instant updates and notifications
@@ -36,7 +36,7 @@ This document describes the Redis integration for the AtoZ Bot Dashboard, which 
                                 │
                                 ▼
                        ┌─────────────────┐
-                       │   SQLite DB     │
+                       │   PostgreSQL   │
                        │                 │
                        │ - Session Data  │
                        │ - Job Records   │
@@ -262,7 +262,7 @@ curl http://localhost:8000/api/bot/system-status
 
 ## Performance Benefits
 
-### Before Redis (SQLite-only)
+### Before Redis (PostgreSQL-only)
 - Bot status updates: ~100-200ms (database query)
 - Session management: Database locks
 - No task queuing: Synchronous operations
@@ -277,7 +277,7 @@ curl http://localhost:8000/api/bot/system-status
 ## Migration Strategy
 
 ### Phase 1: Parallel Implementation
-- Keep existing SQLite-based system
+- Keep existing PostgreSQL-based system
 - Add Redis-based system alongside
 - Test Redis system thoroughly
 
@@ -287,7 +287,7 @@ curl http://localhost:8000/api/bot/system-status
 - Monitor performance and stability
 
 ### Phase 3: Full Migration
-- Remove SQLite-only bot control
+- Remove PostgreSQL-only bot control
 - Optimize Redis configuration
 - Add advanced Redis features
 

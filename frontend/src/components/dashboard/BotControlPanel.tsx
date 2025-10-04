@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Activity, Clock, Play, Power, Settings, Square } from 'lucide-react';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBotStore } from '../../stores/botStore';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
@@ -18,6 +19,7 @@ const BotControlPanel: React.FC = () => {
     startupMessage
   } = useBotStore();
   const [sessionName, setSessionName] = useState('');
+  const navigate = useNavigate();
 
   const handleStart = async () => {
     try {
@@ -34,6 +36,10 @@ const BotControlPanel: React.FC = () => {
     } catch (error) {
       console.error('Failed to stop bot:', error);
     }
+  };
+
+  const handleSettingsClick = () => {
+    navigate('/settings');
   };
 
   const getStatusColor = (status: string) => {
@@ -267,6 +273,7 @@ const BotControlPanel: React.FC = () => {
             variant="secondary"
             className="flex-1"
             size="md"
+            onClick={handleSettingsClick}
           >
             <Settings className="w-4 h-4 mr-2" />
             Settings

@@ -106,6 +106,11 @@ export const apiService = {
     return response.data;
   },
 
+  async refreshBotConfiguration(): Promise<any> {
+    const response = await apiClient.post('/api/bot/configuration/refresh');
+    return response.data;
+  },
+
   // Health Check
   async healthCheck(): Promise<{ status: string; timestamp: string; version: string }> {
     const response = await apiClient.get('/health');

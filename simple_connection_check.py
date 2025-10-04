@@ -20,10 +20,10 @@ def check_database_connection():
         sys.path.append('backend')
         from app.database.connection import engine, redis_client
         
-        # Check SQLite database
+        # Check PostgreSQL database
         with engine.connect() as conn:
             result = conn.execute("SELECT 1")
-            print("✅ SQLite Database: Connected")
+            print("✅ PostgreSQL Database: Connected")
         
         # Check Redis
         if redis_client:

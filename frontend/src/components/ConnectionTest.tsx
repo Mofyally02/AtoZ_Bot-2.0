@@ -246,6 +246,10 @@ const ConnectionTest: React.FC = () => {
                     (Retry: {connectionStatus.services[service.key].retryCount})
                   </span>
                 )}
+                {/* Health indicator */}
+                <div className={`w-2 h-2 rounded-full ${
+                  isHealthy ? 'bg-green-500' : 'bg-red-500'
+                }`} title={`Health: ${statusText}`} />
               </div>
           </div>
           );

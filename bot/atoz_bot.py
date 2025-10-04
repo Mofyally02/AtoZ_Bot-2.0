@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 
 from config import (ATOZ_BASE_URL, ATOZ_INTERPRETER_JOBS_PATH, ATOZ_PASSWORD,
                     ATOZ_USERNAME, BOT_CONFIG, MAX_ACCEPT_PER_RUN)
+from dynamic_config import get_bot_config, get_check_interval, get_max_accept_per_run, get_job_type_filter, refresh_config
 from login_handler import initialize_browser, perform_login
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -49,6 +50,8 @@ def update_database_stats(session_id: str, total_checks: int, total_accepted: in
     """Update database with bot statistics"""
     try:
         api_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+        log(f"🔄 Sending database update: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
+        
         response = requests.post(
             f"{api_url}/api/bot/realtime-update",
             json={
@@ -65,22 +68,46 @@ def update_database_stats(session_id: str, total_checks: int, total_accepted: in
             },
             timeout=5
         )
+        
+        log(f"📡 Database update response: {response.status_code} - {response.text}")
+        
         if response.status_code == 200:
-            log(f"Database updated: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
+            log(f"✅ Database updated: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
         else:
-            log(f"Failed to update database: {response.status_code}")
+            log(f"❌ Failed to update database: {response.status_code} - {response.text}")
     except Exception as e:
         log(f"Error updating database: {e}")
 
 
-def try_login(page) -> None:
+def try_login(page) -> bool:
+    """Attempt to login and return success status"""
     if not (ATOZ_USERNAME and ATOZ_PASSWORD):
-        return
+        log("❌ No credentials provided")
+        return False
+    
     try:
+        log(f"🔐 Attempting login with username: {ATOZ_USERNAME}")
         perform_login(page, ATOZ_BASE_URL, {"username": ATOZ_USERNAME, "password": ATOZ_PASSWORD})
-        log("Logged in.")
-    except Exception:
-        pass
+        
+        # Verify login success by checking for user elements or dashboard
+        try:
+            # Wait for either user header or dashboard elements
+            page.wait_for_selector(".header__name, .dashboard, .user-menu, [data-testid='user-menu']", timeout=10000)
+            log("✅ Successfully logged in!")
+            return True
+        except PlaywrightTimeoutError:
+            # Check if we're on a dashboard/jobs page
+            current_url = page.url
+            if "dashboard" in current_url.lower() or "jobs" in current_url.lower() or "interpreter" in current_url.lower():
+                log("✅ Login appears successful (redirected to dashboard)")
+                return True
+            else:
+                log("❌ Login verification failed - not on expected page")
+                return False
+                
+    except Exception as e:
+        log(f"❌ Login failed: {e}")
+        return False
 
 
 def accept_jobs_on_page(page) -> int:
@@ -202,21 +229,67 @@ def run_bot_with_session(session_id: str) -> None:
             )
             page = context.new_page()
             
-            # Login once at start
+            # Login once at start with retry logic
             send_status_update(session_id, "login_attempting", {"step": "connecting"})
-            page.goto(jobs_url, wait_until="networkidle")
-            try_login(page)
+            
+            login_successful = False
+            max_login_retries = 3
+            
+            for login_attempt in range(max_login_retries):
+                try:
+                    log(f"Login attempt {login_attempt + 1}/{max_login_retries}")
+                    page.goto(jobs_url, wait_until="networkidle")
+                    
+                    # Check if we got a Chrome error page
+                    current_url = page.url
+                    if "chrome-error://" in current_url or "error" in current_url.lower():
+                        log(f"Chrome error page detected: {current_url}")
+                        if login_attempt < max_login_retries - 1:
+                            log("Retrying login in 3 seconds...")
+                            time.sleep(3)
+                            continue
+                    
+                    login_successful = try_login(page)
+                    if login_successful:
+                        break
+                    else:
+                        if login_attempt < max_login_retries - 1:
+                            log("Login failed, retrying in 3 seconds...")
+                            time.sleep(3)
+                            continue
+                            
+                except Exception as login_error:
+                    log(f"Login attempt {login_attempt + 1} failed: {login_error}")
+                    if login_attempt < max_login_retries - 1:
+                        log("Retrying login in 3 seconds...")
+                        time.sleep(3)
+                        continue
+            
+            if not login_successful:
+                log("❌ Failed to login after all attempts. Bot cannot continue.")
+                update_database_stats(session_id, total_checks, total_accepted, total_rejected, "error")
+                send_status_update(session_id, "login_failed", {"message": "Login failed after multiple attempts. Please check credentials."})
+                return
+            
             send_status_update(session_id, "login_successful", {"step": "completed"})
             
             # Update database with login success
             update_database_stats(session_id, total_checks, total_accepted, total_rejected, "running")
             send_status_update(session_id, "running", {"message": "Bot is now running and checking for jobs"})
             
-            # Continuous job checking loop
+            # Continuous job checking loop - runs infinitely
             cycle = 0
+            consecutive_errors = 0
+            max_consecutive_errors = 10  # Allow up to 10 consecutive errors before giving up
+            total_cycles = 0
+            
+            log("🔄 Starting infinite job checking loop...")
+            log("🔄 Bot will run continuously until manually stopped...")
+            
             while True:
                 try:
                     cycle += 1
+                    consecutive_errors = 0  # Reset error counter on successful cycle start
                     log(f"Starting job check cycle #{cycle}")
                     send_status_update(session_id, "checking_jobs", {"cycle": cycle, "step": "navigating"})
                     
@@ -321,13 +394,26 @@ def run_bot_with_session(session_id: str) -> None:
                     })
                     
                     # Wait before next cycle
-                    wait_time = BOT_CONFIG.get("check_interval", 0.5)
-                    log(f"Waiting {wait_time}s before next cycle...")
+                    # Wait before next check (using dynamic interval from database)
+                    wait_time = get_check_interval()
+                    total_cycles += 1
+                    log(f"✅ Cycle #{cycle} completed successfully. Total cycles: {total_cycles}")
+                    log(f"⏳ Waiting {wait_time}s before next cycle...")
                     time.sleep(wait_time)
                 
                 except Exception as cycle_error:
-                    log(f"Error in cycle #{cycle}: {cycle_error}")
-                    send_status_update(session_id, "cycle_error", {"cycle": cycle, "error": str(cycle_error)})
+                    consecutive_errors += 1
+                    log(f"Error in cycle #{cycle} (consecutive errors: {consecutive_errors}): {cycle_error}")
+                    send_status_update(session_id, "cycle_error", {"cycle": cycle, "error": str(cycle_error), "consecutive_errors": consecutive_errors})
+                    
+                    # Check if we've hit the maximum consecutive errors
+                    if consecutive_errors >= max_consecutive_errors:
+                        log(f"❌ Maximum consecutive errors ({max_consecutive_errors}) reached. Bot will continue but log the issue.")
+                        send_status_update(session_id, "max_errors_reached", {"consecutive_errors": consecutive_errors})
+                        # Don't break - continue running but reset counter after a longer wait
+                        time.sleep(30)
+                        consecutive_errors = 0
+                        continue
                     
                     # If it's a Playwright error, try to recover
                     if "EPIPE" in str(cycle_error) or "playwright" in str(cycle_error).lower():
@@ -338,31 +424,73 @@ def run_bot_with_session(session_id: str) -> None:
                             log("Page refreshed successfully")
                         except Exception as refresh_error:
                             log(f"Failed to refresh page: {refresh_error}")
-                            # If refresh fails, break out of the loop to restart the entire bot
-                            break
+                            # If refresh fails, try to reinitialize browser
+                            try:
+                                log("Attempting to reinitialize browser...")
+                                if 'context' in locals():
+                                    context.close()
+                                if 'browser' in locals():
+                                    browser.close()
+                                
+                                # Reinitialize browser
+                                p, browser, context, page = initialize_browser()
+                                jobs_url = urljoin(ATOZ_BASE_URL, ATOZ_INTERPRETER_JOBS_PATH)
+                                page.goto(jobs_url, wait_until="networkidle")
+                                
+                                # Re-login
+                                login_successful = try_login(page)
+                                if not login_successful:
+                                    log("❌ Failed to re-login after browser restart, will retry in next cycle")
+                                    # Don't break - continue the loop to retry
+                                    time.sleep(10)  # Wait longer before retrying
+                                    continue
+                                
+                                log("✅ Browser reinitialized and re-logged in successfully")
+                            except Exception as restart_error:
+                                log(f"Failed to restart browser: {restart_error}, will retry in next cycle")
+                                # Don't break - continue the loop to retry
+                                time.sleep(15)  # Wait longer before retrying
+                                continue
                     else:
                         # For other errors, just log and continue
                         log(f"Non-Playwright error, continuing...")
                     
-                    # Wait a bit before retrying
-                    time.sleep(5)
+                    # Wait a bit before retrying (longer wait for consecutive errors)
+                    wait_time = min(5 + (consecutive_errors * 2), 30)  # Progressive backoff, max 30 seconds
+                    log(f"Waiting {wait_time}s before retrying (progressive backoff)...")
+                    time.sleep(wait_time)
                 
+    except KeyboardInterrupt:
+        log("🛑 Bot stopped by user (KeyboardInterrupt)")
+        update_database_stats(session_id, total_checks, total_accepted, total_rejected, "stopped")
+        send_status_update(session_id, "bot_stopped", {"message": "Bot stopped by user"})
     except Exception as e:
-        log(f"Bot error: {e}")
+        log(f"❌ Critical bot error: {e}")
         update_database_stats(session_id, total_checks, total_accepted, total_rejected, "error")
         send_status_update(session_id, "error", {"message": str(e)})
+        # Even on critical errors, try to continue the loop
+        log("🔄 Attempting to continue bot operation despite critical error...")
+        time.sleep(10)  # Wait before continuing
     finally:
-        try:
-            if 'context' in locals():
+        # Only cleanup if we're actually stopping (not continuing)
+        if 'context' in locals() and 'browser' in locals():
+            try:
+                log("🧹 Cleaning up browser resources...")
                 context.close()
-        except Exception as e:
-            log(f"Error closing context: {e}")
-        try:
-            if 'browser' in locals():
                 browser.close()
+                if 'p' in locals():
+                    p.stop()
+                log("✅ Browser resources cleaned up")
+            except Exception as e:
+                log(f"⚠️ Error cleaning up browser resources: {e}")
+        
+        # Update final status only if we're actually stopping
+        try:
+            update_database_stats(session_id, total_checks, total_accepted, total_rejected, "stopped")
+            send_status_update(session_id, "bot_stopped", {"message": "Bot stopped"})
+            log(f"🛑 Bot session {session_id} ended. Total: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
         except Exception as e:
-            log(f"Error closing browser: {e}")
-        log(f"Bot session {session_id} ended. Total: {total_checks} checks, {total_accepted} accepted, {total_rejected} rejected")
+            log(f"⚠️ Error updating final status: {e}")
 
 
 def run_once() -> int:
@@ -376,7 +504,10 @@ def run_once() -> int:
         
         # Login once at start
         page.goto(jobs_url, wait_until="networkidle")
-        try_login(page)
+        login_successful = try_login(page)
+        if not login_successful:
+            log("❌ Failed to login. Cannot proceed.")
+            return 0
         
         # Navigate to job board and stay logged in
         navigate_to_job_board(page, ATOZ_BASE_URL)

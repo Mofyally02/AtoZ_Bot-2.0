@@ -4,6 +4,7 @@ Pydantic schemas for API requests and responses
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +31,7 @@ class JobRecordCreate(BaseModel):
 
 # Response Schemas
 class BotSessionResponse(BaseModel):
-    id: str
+    id: UUID
     session_name: str
     start_time: datetime
     end_time: Optional[datetime] = None
@@ -46,8 +47,8 @@ class BotSessionResponse(BaseModel):
         from_attributes = True
 
 class JobRecordResponse(BaseModel):
-    id: str
-    session_id: str
+    id: UUID
+    session_id: UUID
     job_ref: str
     language: str
     appointment_date: datetime
@@ -86,7 +87,7 @@ class BotStatusResponse(BaseModel):
     total_rejected: int
 
 class BotConfigurationResponse(BaseModel):
-    id: str
+    id: UUID
     config_name: str
     check_interval_seconds: Decimal
     results_report_interval_seconds: int
@@ -106,8 +107,8 @@ class BotConfigurationResponse(BaseModel):
         from_attributes = True
 
 class SystemLogResponse(BaseModel):
-    id: str
-    session_id: str
+    id: UUID
+    session_id: UUID
     log_level: str
     message: str
     component: Optional[str] = None

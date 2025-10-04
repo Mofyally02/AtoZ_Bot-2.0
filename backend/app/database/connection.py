@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 # Database URLs
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db"
+    "postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db"
 )
 
 # Debug network connectivity
@@ -45,7 +45,7 @@ if "database" in DATABASE_URL:
                 print("Could not resolve database hostname")
         except Exception as e:
             print(f"Error checking database hostname: {e}")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 # Debug logging
 print(f"Database URL: {DATABASE_URL}")

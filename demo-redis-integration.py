@@ -161,12 +161,12 @@ def demo_performance_comparison():
     # Simulate database operations
     print("Simulating database operations...")
     
-    # SQLite operations (simulated)
+    # PostgreSQL operations (simulated)
     start_time = time.time()
     for i in range(100):
         # Simulate database query
         time.sleep(0.001)  # 1ms per operation
-    sqlite_time = time.time() - start_time
+    postgresql_time = time.time() - start_time
     
     # Redis operations (simulated)
     start_time = time.time()
@@ -175,9 +175,9 @@ def demo_performance_comparison():
         time.sleep(0.0001)  # 0.1ms per operation
     redis_time = time.time() - start_time
     
-    print(f"SQLite (100 operations): {sqlite_time:.3f}s")
+    print(f"PostgreSQL (100 operations): {postgresql_time:.3f}s")
     print(f"Redis (100 operations): {redis_time:.3f}s")
-    print(f"Performance improvement: {sqlite_time/redis_time:.1f}x faster")
+    print(f"Performance improvement: {postgresql_time/redis_time:.1f}x faster")
 
 if __name__ == "__main__":
     demo_redis_integration()

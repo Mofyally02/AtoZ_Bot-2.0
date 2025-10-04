@@ -25,7 +25,7 @@ A comprehensive connection monitoring and management system that ensures all par
 - Last check timestamp recording
 
 ### 🎯 **Service Coverage**
-- **Database**: SQLite connection health
+- **Database**: PostgreSQL connection health
 - **Redis**: Cache service availability
 - **Bot Process**: AtoZ Bot process status
 - **External API**: Backend API connectivity

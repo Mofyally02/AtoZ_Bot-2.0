@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import {
     Activity,
     CheckCircle,
-    Clock,
     Globe,
     RefreshCw,
     Settings,
@@ -16,6 +15,7 @@ import BotControlPanel from '../components/dashboard/BotControlPanel';
 import ConnectionTest from '../components/ConnectionTest';
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
+import BotUptimeCard from '../components/ui/BotUptimeCard';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useBotStore } from '../stores/botStore';
 
@@ -146,7 +146,13 @@ const Dashboard: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Metrics Grid */}
+      {/* Bot Control and Connection Status - Horizontal Layout */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <BotControlPanel />
+        <ConnectionTest />
+      </motion.div>
+
+      {/* Quick Stats - Metrics Grid */}
       <motion.div 
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
@@ -170,17 +176,7 @@ const Dashboard: React.FC = () => {
           value={dashboardMetrics?.active_sessions || 0}
           icon={<Zap className="w-6 h-6 text-warning-600" />}
         />
-        <MetricCard
-          title="Bot Uptime"
-          value={`${dashboardMetrics?.bot_uptime_hours || 0}h`}
-          icon={<Clock className="w-6 h-6 text-secondary-600" />}
-        />
-      </motion.div>
-
-      {/* Bot Control and Connection Status - Horizontal Layout */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-        <BotControlPanel />
-        <ConnectionTest />
+        <BotUptimeCard />
       </motion.div>
 
       {/* Recent Activity */}

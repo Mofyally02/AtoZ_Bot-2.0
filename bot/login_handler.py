@@ -37,7 +37,21 @@ def perform_login(page, base_url: str, credentials: dict) -> None:
     Waits for the header user element as a success criterion.
     """
     login_url = f"{base_url.rstrip('/')}/login"
-    page.goto(login_url, wait_until="load")
+    
+    # Retry logic for network errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            page.goto(login_url, wait_until="load")
+            break  # Success, continue with login
+        except Exception as e:
+            if "ERR_NETWORK_CHANGED" in str(e) and attempt < max_retries - 1:
+                print(f"⚠️ Network error during login navigation (attempt {attempt + 1}), retrying in 2 seconds...")
+                time.sleep(2)
+                continue
+            else:
+                raise  # Re-raise if not a network error or retries exhausted
+    
     _human_pause()
 
     # Fill email
@@ -58,10 +72,16 @@ def perform_login(page, base_url: str, credentials: dict) -> None:
     page.wait_for_load_state("networkidle")
 
     try:
-        page.wait_for_selector(".header__name", timeout=10000)
+        # Wait for login success indicators
+        page.wait_for_selector(".header__name, .dashboard, .user-menu, [data-testid='user-menu'], .header__user", timeout=10000)
     except PlaywrightTimeoutError:
-        # Fallback: still accept if redirected to dashboard/job board
-        pass
+        # Fallback: check if we're on a dashboard/jobs page
+        current_url = page.url
+        if "dashboard" in current_url.lower() or "jobs" in current_url.lower() or "interpreter" in current_url.lower():
+            print("Login successful - redirected to dashboard/jobs page")
+        else:
+            print(f"Login verification failed - current URL: {current_url}")
+            raise
     _human_pause(0.8, 1.4)
 
 
