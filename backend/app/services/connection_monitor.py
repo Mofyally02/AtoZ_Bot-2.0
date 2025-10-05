@@ -16,7 +16,7 @@ import psutil
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.database.connection import get_db, engine, get_redis
+from ..database.connection import get_db, engine, get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class ConnectionMonitor:
         try:
             # First check if simple toggle bot is running
             try:
-                from app.api.bot_control import bot_running
+                from ..api.bot_control import bot_running
                 if bot_running:
                     return ConnectionStatus.HEALTHY
             except ImportError:

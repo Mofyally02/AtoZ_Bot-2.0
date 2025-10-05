@@ -18,10 +18,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.database.connection import get_db
-from app.models.bot_models import (BotConfiguration, BotSession,
+from ..database.connection import get_db
+from ..models.bot_models import (BotConfiguration, BotSession,
                                            JobRecord, SystemLog)
-from app.schemas.bot_schemas import (AnalyticsResponse,
+from ..schemas.bot_schemas import (AnalyticsResponse,
                                              BotControlRequest,
                                              BotSessionCreate,
                                              BotSessionResponse,
@@ -29,7 +29,7 @@ from app.schemas.bot_schemas import (AnalyticsResponse,
                                              JobRecordResponse,
                                              DashboardMetrics,
                                              BotConfigurationResponse)
-from app.services.bot_service import BotService
+from ..services.bot_service import BotService
 
 router = APIRouter(prefix="/api/bot", tags=["bot-control"])
 
@@ -138,7 +138,7 @@ async def force_reset_bot():
     
     # Reset database sessions
     try:
-        from app.database.connection import get_db
+        from ..database.connection import get_db
         db = next(get_db())
         if db:
             db.execute(text("""
@@ -248,7 +248,7 @@ async def realtime_update(update_data: dict):
             
             if session_id:
                 try:
-                    from app.database.connection import get_db
+                    from ..database.connection import get_db
                     from sqlalchemy import text
                     
                     print(f"[{datetime.now()}] 📊 Getting database connection...")
@@ -336,7 +336,7 @@ async def toggle_bot():
             
             # Reset database sessions
             try:
-                from app.database.connection import get_db
+                from ..database.connection import get_db
                 db = next(get_db())
                 if db:
                     db.execute(text("""
@@ -382,7 +382,7 @@ async def start_bot(
     session = None  # Initialize session variable
     try:
         # First, check all connections before starting bot
-        from app.services.connection_monitor import connection_monitor
+        from ..services.connection_monitor import connection_monitor
         connection_status = await connection_monitor.check_all_services()
         
         # Check if critical services are healthy
@@ -846,7 +846,7 @@ async def update_bot_configuration(
     
     # Send real-time update about configuration change
     try:
-        from app.api.websocket import manager
+        from .websocket import manager
         await manager.broadcast({
             "type": "configuration_updated",
             "data": {
@@ -867,7 +867,7 @@ async def update_bot_configuration(
 async def refresh_bot_configuration():
     """Signal bot to refresh its configuration from database"""
     try:
-        from app.api.websocket import manager
+        from .websocket import manager
         await manager.broadcast({
             "type": "config_refresh_requested",
             "data": {
@@ -961,7 +961,7 @@ async def monitor_bot_process(session_id: str, db: Session):
 async def send_realtime_update(update_type: str, data: dict):
     """Send real-time update to all connected WebSocket clients"""
     try:
-        from app.api.websocket import manager
+        from .websocket import manager
         update_data = {
             "type": update_type,
             "data": data,
