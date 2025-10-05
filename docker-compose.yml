@@ -62,7 +62,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
-      - "5433:5432"  # Use port 5433 on host to avoid conflict with local PostgreSQL
+      - "5432:5432"  # Use port 5433 on host to avoid conflict with local PostgreSQL
     networks:
       - atoz-network
     restart: unless-stopped
