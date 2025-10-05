@@ -56,7 +56,7 @@ def update_database(session_id, status, checks=0, accepted=0, rejected=0, login_
     """Update the database with bot status"""
     try:
         # Connect to the database
-        engine = create_engine("postgresql+psycopg://atoz_user:atoz_password@localhost:5432/atoz_bot_db")
+        engine = create_engine("postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db")
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
         with SessionLocal() as db:

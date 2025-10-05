@@ -1,204 +1,433 @@
 #!/usr/bin/env python3
 """
-Integration test script for AtoZ Bot Dashboard
-Tests all API endpoints and WebSocket functionality
+Integration Test Script for AtoZ Bot System
+Tests all component connections and functionality
 """
-import asyncio
-import json
+
+import os
+import sys
+import time
 import requests
-import websockets
-from datetime import datetime
+import json
+import psycopg2
+import redis
+from datetime import datetime, timezone
+from typing import Dict, Any, List
 
-# Configuration
-API_BASE_URL = "http://localhost:8000"
-WS_URL = "ws://localhost:8000/ws"
+# Add backend to path
+sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
-def test_api_endpoints():
-    """Test all API endpoints"""
-    print("🧪 Testing API Endpoints...")
+class IntegrationTester:
+    """Integration tester for all system components"""
     
-    # Test health check
-    try:
-        response = requests.get(f"{API_BASE_URL}/health")
-        print(f"✅ Health check: {response.status_code}")
-        print(f"   Response: {response.json()}")
-    except Exception as e:
-        print(f"❌ Health check failed: {e}")
-    
-    # Test bot status
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/bot/status")
-        print(f"✅ Bot status: {response.status_code}")
-        print(f"   Response: {response.json()}")
-    except Exception as e:
-        print(f"❌ Bot status failed: {e}")
-    
-    # Test dashboard metrics
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/bot/dashboard/metrics")
-        print(f"✅ Dashboard metrics: {response.status_code}")
-        print(f"   Response: {response.json()}")
-    except Exception as e:
-        print(f"❌ Dashboard metrics failed: {e}")
-    
-    # Test analytics
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/bot/analytics")
-        print(f"✅ Analytics: {response.status_code}")
-        print(f"   Response: {response.json()}")
-    except Exception as e:
-        print(f"❌ Analytics failed: {e}")
-    
-    # Test job records
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/bot/jobs")
-        print(f"✅ Job records: {response.status_code}")
-        print(f"   Response: {response.json()}")
-    except Exception as e:
-        print(f"❌ Job records failed: {e}")
-
-def test_bot_control():
-    """Test bot start/stop functionality"""
-    print("\n🤖 Testing Bot Control...")
-    
-    # Test start bot
-    try:
-        response = requests.post(f"{API_BASE_URL}/api/bot/start", json={
-            "session_name": "Test Session"
-        })
-        print(f"✅ Start bot: {response.status_code}")
-        print(f"   Response: {response.json()}")
+    def __init__(self):
+        self.test_results = {}
+        self.base_url = "http://localhost:8000"
+        self.frontend_url = "http://localhost:3000"
         
-        if response.status_code == 200:
-            # Wait a bit for bot to start
-            import time
+    def log(self, message: str, level: str = "INFO"):
+        """Log with timestamp"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] [{level}] {message}")
+    
+    def test_database_connection(self) -> bool:
+        """Test PostgreSQL database connection"""
+        self.log("Testing database connection...")
+        
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                port=5432,
+                database="atoz_bot_db",
+                user="atoz_user",
+                password="atoz_password"
+            )
+            
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            
+            cursor.close()
+            conn.close()
+            
+            if result[0] == 1:
+                self.log("✅ Database connection successful")
+                return True
+            else:
+                self.log("❌ Database query failed", "ERROR")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ Database connection failed: {e}", "ERROR")
+            return False
+    
+    def test_redis_connection(self) -> bool:
+        """Test Redis connection"""
+        self.log("Testing Redis connection...")
+        
+        try:
+            r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+            r.ping()
+            
+            # Test basic operations
+            r.set("test_key", "test_value")
+            value = r.get("test_key")
+            r.delete("test_key")
+            
+            if value == "test_value":
+                self.log("✅ Redis connection successful")
+                return True
+            else:
+                self.log("❌ Redis operations failed", "ERROR")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ Redis connection failed: {e}", "ERROR")
+            return False
+    
+    def test_backend_api(self) -> bool:
+        """Test backend API endpoints"""
+        self.log("Testing backend API...")
+        
+        try:
+            # Test health endpoint
+            response = requests.get(f"{self.base_url}/health", timeout=10)
+            if response.status_code != 200:
+                self.log(f"❌ Health endpoint failed: {response.status_code}", "ERROR")
+                return False
+            
+            health_data = response.json()
+            self.log(f"✅ Health check passed: {health_data.get('status', 'unknown')}")
+            
+            # Test detailed health endpoint
+            response = requests.get(f"{self.base_url}/health/detailed", timeout=10)
+            if response.status_code == 200:
+                detailed_health = response.json()
+                self.log(f"✅ Detailed health check passed")
+                
+                # Log service statuses
+                services = detailed_health.get('services', {})
+                for service, status in services.items():
+                    status_val = status.get('status', 'unknown')
+                    icon = "✅" if status_val == 'healthy' else "❌"
+                    self.log(f"  {icon} {service}: {status_val}")
+            else:
+                self.log(f"⚠️ Detailed health check failed: {response.status_code}", "WARNING")
+            
+            # Test bot status endpoint
+            response = requests.get(f"{self.base_url}/api/bot/status", timeout=10)
+            if response.status_code == 200:
+                bot_status = response.json()
+                self.log(f"✅ Bot status endpoint working: {bot_status.get('is_running', False)}")
+            else:
+                self.log(f"⚠️ Bot status endpoint failed: {response.status_code}", "WARNING")
+            
+            # Test dashboard metrics endpoint
+            response = requests.get(f"{self.base_url}/api/bot/dashboard/metrics", timeout=10)
+            if response.status_code == 200:
+                metrics = response.json()
+                self.log(f"✅ Dashboard metrics endpoint working")
+            else:
+                self.log(f"⚠️ Dashboard metrics endpoint failed: {response.status_code}", "WARNING")
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ Backend API test failed: {e}", "ERROR")
+            return False
+    
+    def test_websocket_connection(self) -> bool:
+        """Test WebSocket connection"""
+        self.log("Testing WebSocket connection...")
+        
+        try:
+            import websocket
+            
+            ws_url = "ws://localhost:8000/ws"
+            received_message = False
+            
+            def on_message(ws, message):
+                nonlocal received_message
+                received_message = True
+                self.log(f"✅ Received WebSocket message: {message[:100]}...")
+                ws.close()
+            
+            def on_error(ws, error):
+                self.log(f"❌ WebSocket error: {error}", "ERROR")
+            
+            def on_close(ws, close_status_code, close_msg):
+                self.log("WebSocket connection closed")
+            
+            def on_open(ws):
+                self.log("✅ WebSocket connection established")
+            
+            ws = websocket.WebSocketApp(
+                ws_url,
+                on_open=on_open,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close
+            )
+            
+            # Run WebSocket for 5 seconds
+            ws.run_forever(timeout=5)
+            
+            if received_message:
+                self.log("✅ WebSocket test successful")
+                return True
+            else:
+                self.log("❌ No WebSocket message received", "ERROR")
+                return False
+                
+        except ImportError:
+            self.log("⚠️ websocket-client not installed, skipping WebSocket test", "WARNING")
+            return True
+        except Exception as e:
+            self.log(f"❌ WebSocket test failed: {e}", "ERROR")
+            return False
+    
+    def test_frontend_connection(self) -> bool:
+        """Test frontend connection"""
+        self.log("Testing frontend connection...")
+        
+        try:
+            response = requests.get(self.frontend_url, timeout=10)
+            if response.status_code == 200:
+                self.log("✅ Frontend connection successful")
+                return True
+            else:
+                self.log(f"❌ Frontend connection failed: {response.status_code}", "ERROR")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ Frontend connection failed: {e}", "ERROR")
+            return False
+    
+    def test_bot_integration(self) -> bool:
+        """Test bot integration with API"""
+        self.log("Testing bot integration...")
+        
+        try:
+            # Test bot toggle endpoint
+            response = requests.post(f"{self.base_url}/api/bot/toggle", timeout=10)
+            if response.status_code == 200:
+                result = response.json()
+                self.log(f"✅ Bot toggle endpoint working: {result}")
+                
+                # Wait a moment and check status
+                time.sleep(2)
+                status_response = requests.get(f"{self.base_url}/api/bot/status", timeout=10)
+                if status_response.status_code == 200:
+                    status = status_response.json()
+                    self.log(f"✅ Bot status check working: {status.get('is_running', False)}")
+                
+                # Toggle bot back off
+                time.sleep(2)
+                requests.post(f"{self.base_url}/api/bot/toggle", timeout=10)
+                
+                return True
+            else:
+                self.log(f"❌ Bot toggle endpoint failed: {response.status_code}", "ERROR")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ Bot integration test failed: {e}", "ERROR")
+            return False
+    
+    def test_database_schema(self) -> bool:
+        """Test database schema and tables"""
+        self.log("Testing database schema...")
+        
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                port=5432,
+                database="atoz_bot_db",
+                user="atoz_user",
+                password="atoz_password"
+            )
+            
+            cursor = conn.cursor()
+            
+            # Check if required tables exist
+            required_tables = [
+                'bot_sessions',
+                'job_records', 
+                'analytics_periods',
+                'bot_configurations',
+                'system_logs'
+            ]
+            
+            for table in required_tables:
+                cursor.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = %s
+                    );
+                """, (table,))
+                
+                exists = cursor.fetchone()[0]
+                if exists:
+                    self.log(f"✅ Table '{table}' exists")
+                else:
+                    self.log(f"❌ Table '{table}' missing", "ERROR")
+                    cursor.close()
+                    conn.close()
+                    return False
+            
+            # Test inserting and querying data
+            cursor.execute("""
+                INSERT INTO bot_sessions (session_name, status, login_status)
+                VALUES ('test-session', 'testing', 'success')
+                RETURNING id;
+            """)
+            
+            session_id = cursor.fetchone()[0]
+            self.log(f"✅ Test session created: {session_id}")
+            
+            # Clean up test data
+            cursor.execute("DELETE FROM bot_sessions WHERE id = %s", (session_id,))
+            conn.commit()
+            
+            cursor.close()
+            conn.close()
+            
+            self.log("✅ Database schema test successful")
+            return True
+            
+        except Exception as e:
+            self.log(f"❌ Database schema test failed: {e}", "ERROR")
+            return False
+    
+    def test_end_to_end_flow(self) -> bool:
+        """Test end-to-end bot flow"""
+        self.log("Testing end-to-end bot flow...")
+        
+        try:
+            # 1. Start bot
+            response = requests.post(f"{self.base_url}/api/bot/toggle", timeout=10)
+            if response.status_code != 200:
+                self.log("❌ Failed to start bot", "ERROR")
+                return False
+            
+            self.log("✅ Bot started")
+            
+            # 2. Check bot status
+            time.sleep(3)
+            response = requests.get(f"{self.base_url}/api/bot/status", timeout=10)
+            if response.status_code != 200:
+                self.log("❌ Failed to get bot status", "ERROR")
+                return False
+            
+            bot_status = response.json()
+            self.log(f"✅ Bot status: {bot_status.get('is_running', False)}")
+            
+            # 3. Check dashboard metrics
+            response = requests.get(f"{self.base_url}/api/bot/dashboard/metrics", timeout=10)
+            if response.status_code != 200:
+                self.log("❌ Failed to get dashboard metrics", "ERROR")
+                return False
+            
+            metrics = response.json()
+            self.log(f"✅ Dashboard metrics retrieved")
+            
+            # 4. Stop bot
             time.sleep(2)
+            response = requests.post(f"{self.base_url}/api/bot/toggle", timeout=10)
+            if response.status_code != 200:
+                self.log("❌ Failed to stop bot", "ERROR")
+                return False
             
-            # Test stop bot
-            response = requests.post(f"{API_BASE_URL}/api/bot/stop")
-            print(f"✅ Stop bot: {response.status_code}")
-            print(f"   Response: {response.json()}")
-        
-    except Exception as e:
-        print(f"❌ Bot control failed: {e}")
-
-async def test_websocket():
-    """Test WebSocket connection and real-time updates"""
-    print("\n🔌 Testing WebSocket Connection...")
+            self.log("✅ Bot stopped")
+            
+            # 5. Verify bot is stopped
+            time.sleep(2)
+            response = requests.get(f"{self.base_url}/api/bot/status", timeout=10)
+            if response.status_code == 200:
+                bot_status = response.json()
+                if not bot_status.get('is_running', True):
+                    self.log("✅ Bot successfully stopped")
+                    return True
+                else:
+                    self.log("❌ Bot still running after stop command", "ERROR")
+                    return False
+            else:
+                self.log("❌ Failed to verify bot stop", "ERROR")
+                return False
+            
+        except Exception as e:
+            self.log(f"❌ End-to-end flow test failed: {e}", "ERROR")
+            return False
     
-    try:
-        async with websockets.connect(WS_URL) as websocket:
-            print("✅ WebSocket connected successfully")
-            
-            # Listen for messages for 10 seconds
-            timeout = 10
-            start_time = datetime.now()
-            
-            while (datetime.now() - start_time).seconds < timeout:
-                try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-                    data = json.loads(message)
-                    print(f"📨 Received: {data['type']}")
-                    print(f"   Data: {json.dumps(data['data'], indent=2)}")
-                except asyncio.TimeoutError:
-                    print("⏰ No message received in 1 second")
-                    break
-                except Exception as e:
-                    print(f"❌ Error receiving message: {e}")
-                    break
-            
-            print("✅ WebSocket test completed")
-            
-    except Exception as e:
-        print(f"❌ WebSocket connection failed: {e}")
-
-async def test_full_integration():
-    """Test complete integration flow"""
-    print("\n🚀 Testing Full Integration Flow...")
-    
-    try:
-        # Start bot
-        print("1. Starting bot...")
-        response = requests.post(f"{API_BASE_URL}/api/bot/start", json={
-            "session_name": "Integration Test"
-        })
+    def run_all_tests(self) -> Dict[str, bool]:
+        """Run all integration tests"""
+        self.log("🧪 Starting Integration Tests")
+        self.log("=" * 50)
         
-        if response.status_code != 200:
-            print(f"❌ Failed to start bot: {response.text}")
-            return
+        tests = [
+            ("Database Connection", self.test_database_connection),
+            ("Database Schema", self.test_database_schema),
+            ("Redis Connection", self.test_redis_connection),
+            ("Backend API", self.test_backend_api),
+            ("WebSocket Connection", self.test_websocket_connection),
+            ("Frontend Connection", self.test_frontend_connection),
+            ("Bot Integration", self.test_bot_integration),
+            ("End-to-End Flow", self.test_end_to_end_flow)
+        ]
         
-        print("✅ Bot started successfully")
+        results = {}
         
-        # Connect to WebSocket
-        print("2. Connecting to WebSocket...")
-        async with websockets.connect(WS_URL) as websocket:
-            print("✅ WebSocket connected")
+        for test_name, test_func in tests:
+            self.log(f"\n🔍 Running: {test_name}")
+            self.log("-" * 30)
             
-            # Monitor for 15 seconds
-            print("3. Monitoring real-time updates...")
-            timeout = 15
-            start_time = datetime.now()
-            message_count = 0
-            
-            while (datetime.now() - start_time).seconds < timeout:
-                try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-                    data = json.loads(message)
-                    message_count += 1
+            try:
+                result = test_func()
+                results[test_name] = result
+                
+                if result:
+                    self.log(f"✅ {test_name} PASSED")
+                else:
+                    self.log(f"❌ {test_name} FAILED", "ERROR")
                     
-                    if data['type'] == 'status_update':
-                        bot_status = data['data'].get('bot_status', {})
-                        print(f"📊 Bot Status: Running={bot_status.get('is_running')}, "
-                              f"Checks={bot_status.get('total_checks')}, "
-                              f"Accepted={bot_status.get('total_accepted')}, "
-                              f"Rejected={bot_status.get('total_rejected')}")
-                    
-                    elif data['type'] in ['job_accepted', 'job_rejected']:
-                        counts = data['data'].get('counts', {})
-                        print(f"🎯 Job {data['type']}: Checks={counts.get('total_checks')}, "
-                              f"Accepted={counts.get('total_accepted')}, "
-                              f"Rejected={counts.get('total_rejected')}")
-                    
-                except asyncio.TimeoutError:
-                    continue
-                except Exception as e:
-                    print(f"❌ Error receiving message: {e}")
-                    break
+            except Exception as e:
+                self.log(f"❌ {test_name} ERROR: {e}", "ERROR")
+                results[test_name] = False
             
-            print(f"✅ Received {message_count} real-time updates")
+            time.sleep(1)  # Brief pause between tests
         
-        # Stop bot
-        print("4. Stopping bot...")
-        response = requests.post(f"{API_BASE_URL}/api/bot/stop")
-        if response.status_code == 200:
-            print("✅ Bot stopped successfully")
+        # Summary
+        self.log("\n" + "=" * 50)
+        self.log("📊 INTEGRATION TEST SUMMARY")
+        self.log("=" * 50)
+        
+        passed = sum(1 for result in results.values() if result)
+        total = len(results)
+        
+        for test_name, result in results.items():
+            status = "✅ PASS" if result else "❌ FAIL"
+            self.log(f"{status} {test_name}")
+        
+        self.log("-" * 30)
+        self.log(f"Total: {passed}/{total} tests passed")
+        
+        if passed == total:
+            self.log("🎉 ALL TESTS PASSED! System is fully integrated.")
         else:
-            print(f"❌ Failed to stop bot: {response.text}")
+            self.log(f"⚠️ {total - passed} tests failed. Please check the issues above.", "WARNING")
         
-        print("🎉 Full integration test completed successfully!")
-        
-    except Exception as e:
-        print(f"❌ Integration test failed: {e}")
+        return results
 
 def main():
-    """Main test function"""
-    print("🧪 AtoZ Bot Dashboard Integration Test")
-    print("=" * 50)
+    """Main function"""
+    tester = IntegrationTester()
+    results = tester.run_all_tests()
     
-    # Test API endpoints
-    test_api_endpoints()
-    
-    # Test bot control
-    test_bot_control()
-    
-    # Test WebSocket
-    asyncio.run(test_websocket())
-    
-    # Test full integration
-    asyncio.run(test_full_integration())
-    
-    print("\n✅ All tests completed!")
+    # Exit with appropriate code
+    if all(results.values()):
+        sys.exit(0)  # Success
+    else:
+        sys.exit(1)  # Failure
 
 if __name__ == "__main__":
     main()
-

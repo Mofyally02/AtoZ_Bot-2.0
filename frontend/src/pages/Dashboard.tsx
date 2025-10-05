@@ -12,7 +12,6 @@ import {
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BotControlPanel from '../components/dashboard/BotControlPanel';
-import ConnectionTest from '../components/ConnectionTest';
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
 import BotUptimeCard from '../components/ui/BotUptimeCard';
@@ -146,10 +145,9 @@ const Dashboard: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Bot Control and Connection Status - Horizontal Layout */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+      {/* Bot Control Panel */}
+      <motion.div variants={itemVariants}>
         <BotControlPanel />
-        <ConnectionTest />
       </motion.div>
 
       {/* Quick Stats - Metrics Grid */}

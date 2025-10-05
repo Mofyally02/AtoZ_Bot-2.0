@@ -12,11 +12,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Database URLs
+# Database URLs - PostgreSQL only
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db"
 )
+
+# Always use PostgreSQL
+USE_POSTGRESQL = True
 
 # Debug network connectivity
 import socket
@@ -58,8 +61,7 @@ engine = create_engine(
     pool_recycle=300,
     pool_size=10,
     max_overflow=20,
-    # PostgreSQL specific configuration
-    connect_args={} if "postgresql" in DATABASE_URL else {"check_same_thread": False}
+    connect_args={}
 )
 
 # Test PostgreSQL connection with retry logic
@@ -87,15 +89,14 @@ def test_postgres_connection():
                 print("This might cause the application to fail to start")
                 return False
 
-# Test connection on startup (non-blocking)
-if "postgresql" in DATABASE_URL:
-    import threading
-    def test_connection_async():
-        test_postgres_connection()
-    
-    # Start connection test in background
-    connection_thread = threading.Thread(target=test_connection_async, daemon=True)
-    connection_thread.start()
+# Test PostgreSQL connection on startup (non-blocking)
+import threading
+def test_connection_async():
+    test_postgres_connection()
+
+# Start connection test in background
+connection_thread = threading.Thread(target=test_connection_async, daemon=True)
+connection_thread.start()
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

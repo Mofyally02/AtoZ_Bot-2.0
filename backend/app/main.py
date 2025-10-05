@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.bot_control import router as bot_router
+from app.api.websocket import manager as websocket_manager
 from app.database.connection import Base, engine
 from app.services.bot_service import BotService
 from app.services.connection_monitor import ConnectionMonitor
@@ -108,7 +109,8 @@ class ConnectionManager:
             if connection in self.active_connections:
                 self.active_connections.remove(connection)
 
-manager = ConnectionManager()
+# Use the global websocket manager from websocket module
+manager = websocket_manager
 bot_service = BotService()
 connection_monitor = ConnectionMonitor()
 
