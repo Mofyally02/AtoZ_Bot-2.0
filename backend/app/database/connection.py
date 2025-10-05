@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 # Database URLs - PostgreSQL only
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://atoz_user:atoz_password@localhost:5432/atoz_bot_db"
+    "postgresql://atoz_user:atoz_password@database:5432/atoz_bot_db"
 )
 
 # Always use PostgreSQL

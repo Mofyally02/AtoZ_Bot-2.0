@@ -62,7 +62,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
-      - "5432:5432"  # Use port 5433 on host to avoid conflict with local PostgreSQL
+      - "5434:5432"  # Use port 5434 on host to avoid conflict with local PostgreSQL
     networks:
       - atoz-network
     restart: unless-stopped
@@ -78,7 +78,7 @@ services:
     image: redis:7-alpine
     container_name: atoz-redis
     ports:
-      - "6380:6379"  # Use port 6380 on host to avoid conflict with local Redis
+      - "6381:6379"  # Use port 6381 on host to avoid conflict with local Redis
     volumes:
       - redis_data:/data
     networks:
